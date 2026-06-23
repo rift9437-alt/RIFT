@@ -1,0 +1,1946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEVEL 7</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0d13;
+    --bg-panel:#12161f;
+    --bg-panel-raised:#1a1f2b;
+    --border:#262c3a;
+    --pink:#ff3d8a;
+    --cyan:#2de2c5;
+    --gold:#ffc857;
+    --text:#e8ecf1;
+    --text-dim:#7c8699;
+    --font-display:'Press Start 2P', monospace;
+    --font-body:'Space Grotesk', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(255,61,138,0.08), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(45,226,197,0.08), transparent 40%);
+    color:var(--text);
+    font-family:var(--font-body);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  .hidden{display:none !important;}
+  .screen{
+    min-height:100vh;
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:24px 16px 60px;
+  }
+
+  /* ---------- scanline overlay ---------- */
+  .scanlines{
+    pointer-events:none;
+    position:fixed;
+    inset:0;
+    background:repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.025) 0px,
+      rgba(255,255,255,0.025) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    z-index:9999;
+    mix-blend-mode:overlay;
+  }
+
+  /* ---------- marquee / logo ---------- */
+  .marquee{
+    font-family:var(--font-display);
+    font-size:34px;
+    letter-spacing:4px;
+    color:var(--cyan);
+    text-shadow:
+      0 0 6px rgba(45,226,197,0.8),
+      0 0 18px rgba(45,226,197,0.5),
+      0 0 2px #fff;
+    animation:flicker 4.2s infinite steps(1);
+    text-align:center;
+  }
+  .marquee span{color:var(--pink); text-shadow:0 0 6px rgba(255,61,138,0.8), 0 0 18px rgba(255,61,138,0.5), 0 0 2px #fff;}
+  @keyframes flicker{
+    0%,93%,96%,100%{opacity:1;}
+    94%{opacity:0.55;}
+    95%{opacity:0.85;}
+    97%{opacity:0.7;}
+  }
+  .tagline{
+    font-family:var(--font-mono);
+    color:var(--text-dim);
+    letter-spacing:2px;
+    font-size:12px;
+    margin-top:10px;
+    text-transform:uppercase;
+  }
+
+  /* ---------- login ---------- */
+  #login-screen{justify-content:center;}
+  .login-card{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:40px 36px 32px;
+    width:100%;
+    max-width:380px;
+    margin-top:36px;
+    box-shadow:0 0 0 1px rgba(255,255,255,0.02), 0 20px 60px rgba(0,0,0,0.5);
+    position:relative;
+  }
+  .login-card::before{
+    content:"";
+    position:absolute;
+    top:0;left:50%;
+    transform:translate(-50%,-50%);
+    width:46px;height:10px;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+  }
+  .field-label{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:1.5px;
+    color:var(--text-dim);
+    margin-bottom:6px;
+    margin-top:18px;
+    display:block;
+    text-transform:uppercase;
+  }
+  input[type=text], input[type=password]{
+    width:100%;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:12px 14px;
+    color:var(--text);
+    font-family:var(--font-mono);
+    font-size:14px;
+    outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input[type=text]:focus, input[type=password]:focus{
+    border-color:var(--cyan);
+    box-shadow:0 0 0 3px rgba(45,226,197,0.15);
+  }
+  .login-error{
+    color:var(--pink);
+    font-family:var(--font-mono);
+    font-size:12px;
+    margin-top:14px;
+    min-height:16px;
+    letter-spacing:0.5px;
+  }
+  .btn{
+    font-family:var(--font-mono);
+    font-weight:600;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    border:none;
+    border-radius:6px;
+    padding:13px 20px;
+    cursor:pointer;
+    font-size:13px;
+    transition:transform .1s, box-shadow .15s, opacity .15s;
+  }
+  .btn:active{transform:translateY(1px) scale(0.98);}
+  .btn-primary{
+    background:linear-gradient(135deg, var(--cyan), #1bb89e);
+    color:#04140f;
+    width:100%;
+    margin-top:22px;
+    box-shadow:0 0 18px rgba(45,226,197,0.35);
+  }
+  .btn-primary:hover{box-shadow:0 0 26px rgba(45,226,197,0.55);}
+  .btn-secondary{
+    background:var(--bg-panel-raised);
+    color:var(--text);
+    border:1px solid var(--border);
+  }
+  .btn-secondary:hover{border-color:var(--cyan); color:var(--cyan);}
+  .btn-pink{
+    background:linear-gradient(135deg, var(--pink), #c92469);
+    color:#180410;
+    box-shadow:0 0 18px rgba(255,61,138,0.35);
+  }
+  .btn-pink:hover{box-shadow:0 0 26px rgba(255,61,138,0.55);}
+  .btn:disabled{opacity:0.35; cursor:not-allowed;}
+
+  .login-foot{
+    margin-top:24px;
+    text-align:center;
+    color:var(--text-dim);
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:1px;
+  }
+  .login-signup{
+    margin-top:14px;
+    text-align:center;
+    color:var(--text-dim);
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.5px;
+  }
+  .signup-link{
+    color:var(--cyan);
+    text-decoration:none;
+    border-bottom:1px dashed rgba(45,226,197,0.5);
+  }
+  .signup-link:hover{
+    color:var(--pink);
+    border-bottom-color:rgba(255,61,138,0.6);
+  }
+
+  /* ---------- dashboard ---------- */
+  #dashboard-screen{align-items:stretch; padding-top:0;}
+  .topbar{
+    width:100%;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:18px 28px;
+    border-bottom:1px solid var(--border);
+    background:rgba(18,22,31,0.6);
+    position:sticky;
+    top:0;
+    z-index:50;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .topbar-logo{
+    font-family:var(--font-display);
+    font-size:16px;
+    color:var(--cyan);
+    letter-spacing:2px;
+    text-shadow:0 0 8px rgba(45,226,197,0.6);
+  }
+  .topbar-logo span{color:var(--pink); text-shadow:0 0 8px rgba(255,61,138,0.6);}
+  .topbar-right{display:flex; align-items:center; gap:14px;}
+  .user-badge{
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+    letter-spacing:1px;
+  }
+  .user-badge b{color:var(--gold);}
+  .dash-content{
+    max-width:1080px;
+    width:100%;
+    margin:0 auto;
+    padding:40px 24px 20px;
+  }
+  .dash-welcome{
+    font-family:var(--font-mono);
+    color:var(--text-dim);
+    font-size:13px;
+    letter-spacing:1px;
+    margin-bottom:6px;
+  }
+  .dash-title{
+    font-family:var(--font-display);
+    font-size:20px;
+    letter-spacing:2px;
+    margin-bottom:30px;
+    color:var(--text);
+  }
+  .cabinet-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
+    gap:18px;
+  }
+  .cabinet{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:22px 20px;
+    cursor:pointer;
+    transition:transform .15s, border-color .15s, box-shadow .15s;
+    position:relative;
+    overflow:hidden;
+  }
+  .cabinet::after{
+    content:"";
+    position:absolute;
+    top:0;left:0;right:0;
+    height:3px;
+    background:var(--accent-c, var(--cyan));
+    opacity:0.8;
+  }
+  .cabinet:hover{
+    transform:translateY(-4px);
+    border-color:var(--accent-c, var(--cyan));
+    box-shadow:0 10px 30px rgba(0,0,0,0.45);
+  }
+  .cabinet-icon{font-size:30px; margin-bottom:10px;}
+  .cabinet-name{
+    font-family:var(--font-body);
+    font-weight:700;
+    font-size:17px;
+    margin-bottom:4px;
+  }
+  .cabinet-desc{
+    color:var(--text-dim);
+    font-size:12.5px;
+    line-height:1.5;
+    margin-bottom:14px;
+    min-height:36px;
+  }
+  .cabinet-stat{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:1px;
+    color:var(--accent-c, var(--cyan));
+    text-transform:uppercase;
+  }
+  .cabinet-leader{
+    background:linear-gradient(135deg, rgba(255,200,87,0.12), rgba(255,200,87,0.02));
+    border-color:rgba(255,200,87,0.35);
+  }
+  .cabinet-leader::after{background:var(--gold);}
+  .cabinet-leader .cabinet-stat{color:var(--gold);}
+
+  /* ---------- generic game screen scaffolding ---------- */
+  .game-screen{align-items:center;}
+  .game-topbar{
+    width:100%;
+    max-width:880px;
+    display:flex;
+    align-items:center;
+    gap:16px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+  }
+  .back-btn{
+    background:var(--bg-panel-raised);
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    font-family:var(--font-mono);
+    font-size:12px;
+    padding:9px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    letter-spacing:1px;
+  }
+  .back-btn:hover{color:var(--cyan); border-color:var(--cyan);}
+  .game-title{
+    font-family:var(--font-display);
+    font-size:16px;
+    letter-spacing:1.5px;
+  }
+  .setup-panel{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:28px;
+    width:100%;
+    max-width:880px;
+  }
+  .setup-section-label{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:1.5px;
+    color:var(--text-dim);
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  .option-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:24px;
+    flex-wrap:wrap;
+  }
+  .option-btn{
+    background:var(--bg-panel-raised);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:var(--font-mono);
+    font-size:12px;
+    letter-spacing:1px;
+    padding:11px 18px;
+    border-radius:6px;
+    cursor:pointer;
+    text-transform:uppercase;
+  }
+  .option-btn.selected{
+    border-color:var(--cyan);
+    color:var(--cyan);
+    box-shadow:0 0 12px rgba(45,226,197,0.25);
+    background:rgba(45,226,197,0.08);
+  }
+  .controls-box{
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:16px 18px;
+    margin-bottom:24px;
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--text-dim);
+    line-height:1.8;
+  }
+  .controls-box b{color:var(--text);}
+  .controls-box .p1c{color:var(--cyan);}
+  .controls-box .p2c{color:var(--pink);}
+
+  .play-area{width:100%; max-width:880px; display:flex; flex-direction:column; align-items:center;}
+  .hud{
+    width:100%;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+    font-family:var(--font-mono);
+    font-size:13px;
+    letter-spacing:1px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .hud-score{
+    font-size:22px;
+    font-weight:600;
+    color:var(--text);
+  }
+  canvas{
+    background:#04060a;
+    border:1px solid var(--border);
+    border-radius:8px;
+    max-width:100%;
+    touch-action:none;
+  }
+  .result-overlay{
+    width:100%;
+    max-width:880px;
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:40px;
+    text-align:center;
+  }
+  .result-overlay h3{
+    font-family:var(--font-display);
+    font-size:18px;
+    letter-spacing:1.5px;
+    margin-bottom:10px;
+  }
+  .result-overlay p{
+    color:var(--text-dim);
+    font-family:var(--font-mono);
+    font-size:13px;
+    margin-bottom:24px;
+  }
+
+  /* ---------- leaderboard ---------- */
+  .lb-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(360px,1fr));
+    gap:20px;
+    width:100%;
+    max-width:1000px;
+  }
+  .lb-card{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:20px 22px;
+  }
+  .lb-card h3{
+    font-family:var(--font-body);
+    font-size:15px;
+    margin:0 0 14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  table{width:100%; border-collapse:collapse;}
+  th{
+    text-align:left;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:var(--text-dim);
+    letter-spacing:1px;
+    text-transform:uppercase;
+    padding:6px 4px;
+    border-bottom:1px solid var(--border);
+  }
+  td{
+    font-family:var(--font-mono);
+    font-size:12.5px;
+    padding:8px 4px;
+    border-bottom:1px solid rgba(38,44,58,0.5);
+  }
+  tr.rank1 td:first-child{color:var(--gold);}
+  tr.rank2 td:first-child{color:#c9d1da;}
+  tr.rank3 td:first-child{color:#cd7f32;}
+  .rank-medal{margin-right:4px;}
+
+  @media (max-width:600px){
+    .marquee{font-size:22px;}
+    .login-card{padding:28px 22px 24px;}
+    .topbar{padding:14px 16px;}
+  }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+
+<!-- ============ LOGIN SCREEN ============ -->
+<div id="login-screen" class="screen">
+  <div class="marquee">LEVEL<span> 7</span></div>
+  <div class="tagline">restricted access &mdash; members only</div>
+  <div class="login-card">
+    <label class="field-label" for="login-username">Username</label>
+    <input type="text" id="login-username" autocomplete="off" placeholder="Enter username" />
+    <label class="field-label" for="login-password">Password</label>
+    <input type="password" id="login-password" autocomplete="off" placeholder="Enter password" />
+    <div class="login-error" id="login-error"></div>
+    <button class="btn btn-primary" id="login-btn" onclick="attemptLogin()">Enter</button>
+  </div>
+  <div class="login-foot">7 KEYHOLDERS ONLY &middot; UNAUTHORIZED ACCESS WILL BE NOTICED</div>
+  <div class="login-signup">
+    Need an account? <a class="signup-link" href="mailto:iwillgetyouarggh@gmail.com?subject=Level%207%20Access%20Request&amp;body=Hey%2C%20I%27d%20like%20an%20account%20for%20Level%207.%0A%0AName%20I%27d%20like%20to%20use%3A%20">Email the admin to request one</a>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD SCREEN ============ -->
+<div id="dashboard-screen" class="screen hidden">
+  <div class="topbar">
+    <div class="topbar-logo">LEVEL<span> 7</span></div>
+    <div class="topbar-right">
+      <span class="user-badge">SIGNED IN AS <b id="current-username">-</b></span>
+      <button class="btn btn-secondary" onclick="logout()">Log Out</button>
+    </div>
+  </div>
+  <div class="dash-content">
+    <div class="dash-welcome" id="dash-welcome-line">WELCOME BACK</div>
+    <div class="dash-title">SELECT A CABINET</div>
+    <div class="cabinet-grid">
+      <div class="cabinet" style="--accent-c:#2de2c5" onclick="stopAllGames(); showScreen('soccer-screen'); SoccerGame.reset();">
+        <div class="cabinet-icon">⚽</div>
+        <div class="cabinet-name">Street Soccer</div>
+        <div class="cabinet-desc">1v1 local soccer. First to 5 goals wins. Play a friend or a bot.</div>
+        <div class="cabinet-stat">Tracks &middot; Goals / Saves / Wins</div>
+      </div>
+      <div class="cabinet" style="--accent-c:#ff3d8a" onclick="stopAllGames(); showScreen('racing-screen'); RacingGame.reset();">
+        <div class="cabinet-icon">🏎️</div>
+        <div class="cabinet-name">Apex Loop</div>
+        <div class="cabinet-desc">Top-down 2D racer. 3 laps to win. Hug the inside line to go faster.</div>
+        <div class="cabinet-stat">Tracks &middot; Wins</div>
+      </div>
+      <div class="cabinet" style="--accent-c:#ffc857" onclick="stopAllGames(); showScreen('tank-screen'); TankGame.reset();">
+        <div class="cabinet-icon">🛡️</div>
+        <div class="cabinet-name">Tank Duel</div>
+        <div class="cabinet-desc">Arena tank combat. First to 3 hits wins. Watch the cover blocks.</div>
+        <div class="cabinet-stat">Tracks &middot; Wins</div>
+      </div>
+      <div class="cabinet" style="--accent-c:#8b8bff" onclick="stopAllGames(); showScreen('runner-screen'); RunnerGame.reset();">
+        <div class="cabinet-icon">🏃</div>
+        <div class="cabinet-name">Hop Runner</div>
+        <div class="cabinet-desc">Solo endless dodger. Jump the obstacles, chase a high score.</div>
+        <div class="cabinet-stat">Tracks &middot; High Score</div>
+      </div>
+      <div class="cabinet cabinet-leader" onclick="stopAllGames(); showScreen('leaderboard-screen'); renderLeaderboard();">
+        <div class="cabinet-icon">🏆</div>
+        <div class="cabinet-name">Leaderboard</div>
+        <div class="cabinet-desc">See how all 7 keyholders stack up across every cabinet.</div>
+        <div class="cabinet-stat">Bragging rights live here</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SOCCER SCREEN ============ -->
+<div id="soccer-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">⚽ STREET SOCCER</div>
+  </div>
+
+  <div class="setup-panel" id="soccer-setup">
+    <div class="setup-section-label">Mode</div>
+    <div class="option-row">
+      <button class="option-btn" id="soccer-mode-single" onclick="SoccerGame.setMode('single')">Single Player</button>
+      <button class="option-btn" id="soccer-mode-multi" onclick="SoccerGame.setMode('multi')">Local Multiplayer</button>
+    </div>
+    <div id="soccer-diff-section">
+      <div class="setup-section-label">Bot Difficulty</div>
+      <div class="option-row">
+        <button class="option-btn" id="soccer-diff-easy" onclick="SoccerGame.setDifficulty('easy')">Easy</button>
+        <button class="option-btn" id="soccer-diff-medium" onclick="SoccerGame.setDifficulty('medium')">Medium</button>
+        <button class="option-btn" id="soccer-diff-hard" onclick="SoccerGame.setDifficulty('hard')">Hard</button>
+      </div>
+    </div>
+    <div class="controls-box">
+      <b class="p1c">PLAYER 1</b> &mdash; A/D move &middot; W jump &middot; S kick<br>
+      <b class="p2c">PLAYER 2</b> &mdash; ←/→ move &middot; ↑ jump &middot; ↓ kick<br>
+      First to <b>5 goals</b> wins the match.
+    </div>
+    <button class="btn btn-primary" onclick="SoccerGame.start()">Start Match</button>
+  </div>
+
+  <div class="play-area hidden" id="soccer-play">
+    <div class="hud">
+      <span id="soccer-p1-label">PLAYER 1</span>
+      <span class="hud-score" id="soccer-score">0 : 0</span>
+      <span id="soccer-p2-label">PLAYER 2</span>
+    </div>
+    <canvas id="soccer-canvas" width="800" height="400"></canvas>
+  </div>
+
+  <div class="result-overlay hidden" id="soccer-result">
+    <h3 id="soccer-result-text">RESULT</h3>
+    <p id="soccer-result-sub"></p>
+    <button class="btn btn-pink" onclick="SoccerGame.reset()">Play Again</button>
+  </div>
+</div>
+
+<!-- ============ RACING SCREEN ============ -->
+<div id="racing-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🏎️ APEX LOOP</div>
+  </div>
+
+  <div class="setup-panel" id="racing-setup">
+    <div class="setup-section-label">Mode</div>
+    <div class="option-row">
+      <button class="option-btn" id="racing-mode-single" onclick="RacingGame.setMode('single')">Single Player</button>
+      <button class="option-btn" id="racing-mode-multi" onclick="RacingGame.setMode('multi')">Local Multiplayer</button>
+    </div>
+    <div id="racing-diff-section">
+      <div class="setup-section-label">Bot Difficulty</div>
+      <div class="option-row">
+        <button class="option-btn" id="racing-diff-easy" onclick="RacingGame.setDifficulty('easy')">Easy</button>
+        <button class="option-btn" id="racing-diff-medium" onclick="RacingGame.setDifficulty('medium')">Medium</button>
+        <button class="option-btn" id="racing-diff-hard" onclick="RacingGame.setDifficulty('hard')">Hard</button>
+      </div>
+    </div>
+    <div class="controls-box">
+      Your car drives forward on its own &mdash; you just steer it.<br>
+      <b class="p1c">PLAYER 1</b> &mdash; A turn left &middot; D turn right<br>
+      <b class="p2c">PLAYER 2</b> &mdash; ← turn left &middot; → turn right<br>
+      Cut tight on the turns to shave time off your lap &mdash; but drift off the track (inside or outside) and you'll hit the grass and slow down.<br>
+      First to finish <b>3 laps</b> wins.
+    </div>
+    <button class="btn btn-primary" onclick="RacingGame.start()">Start Race</button>
+  </div>
+
+  <div class="play-area hidden" id="racing-play">
+    <div class="hud">
+      <span id="racing-p1-label">YOU &middot; LAP 0/3</span>
+      <span id="racing-p2-label">RIVAL &middot; LAP 0/3</span>
+    </div>
+    <canvas id="racing-canvas" width="800" height="600"></canvas>
+  </div>
+
+  <div class="result-overlay hidden" id="racing-result">
+    <h3 id="racing-result-text">RESULT</h3>
+    <p id="racing-result-sub"></p>
+    <button class="btn btn-pink" onclick="RacingGame.reset()">Race Again</button>
+  </div>
+</div>
+
+<!-- ============ TANK SCREEN ============ -->
+<div id="tank-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🛡️ TANK DUEL</div>
+  </div>
+
+  <div class="setup-panel" id="tank-setup">
+    <div class="setup-section-label">Mode</div>
+    <div class="option-row">
+      <button class="option-btn" id="tank-mode-single" onclick="TankGame.setMode('single')">Single Player</button>
+      <button class="option-btn" id="tank-mode-multi" onclick="TankGame.setMode('multi')">Local Multiplayer</button>
+    </div>
+    <div id="tank-diff-section">
+      <div class="setup-section-label">Bot Difficulty</div>
+      <div class="option-row">
+        <button class="option-btn" id="tank-diff-easy" onclick="TankGame.setDifficulty('easy')">Easy</button>
+        <button class="option-btn" id="tank-diff-medium" onclick="TankGame.setDifficulty('medium')">Medium</button>
+        <button class="option-btn" id="tank-diff-hard" onclick="TankGame.setDifficulty('hard')">Hard</button>
+      </div>
+    </div>
+    <div class="controls-box">
+      <b class="p1c">PLAYER 1</b> &mdash; W forward &middot; S backward &middot; A/D rotate &middot; SPACE fire<br>
+      <b class="p2c">PLAYER 2</b> &mdash; ↑ forward &middot; ↓ backward &middot; ←/→ rotate &middot; L fire<br>
+      Use the cover blocks. First to <b>3 hits</b> wins.
+    </div>
+    <button class="btn btn-primary" onclick="TankGame.start()">Start Duel</button>
+  </div>
+
+  <div class="play-area hidden" id="tank-play">
+    <div class="hud">
+      <span id="tank-p1-label">PLAYER 1: 0</span>
+      <span id="tank-p2-label">PLAYER 2: 0</span>
+    </div>
+    <canvas id="tank-canvas" width="800" height="500"></canvas>
+  </div>
+
+  <div class="result-overlay hidden" id="tank-result">
+    <h3 id="tank-result-text">RESULT</h3>
+    <p id="tank-result-sub"></p>
+    <button class="btn btn-pink" onclick="TankGame.reset()">Duel Again</button>
+  </div>
+</div>
+
+<!-- ============ RUNNER SCREEN ============ -->
+<div id="runner-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🏃 HOP RUNNER</div>
+  </div>
+
+  <div class="setup-panel" id="runner-setup">
+    <div class="controls-box">
+      <b>CONTROLS</b> &mdash; SPACE or ↑ to jump<br>
+      Dodge every obstacle by jumping over it. One hit ends the run.<br>
+      Your score is the number of obstacles you clear &mdash; speed ramps up the longer you survive.
+    </div>
+    <button class="btn btn-primary" onclick="RunnerGame.start()">Start Run</button>
+  </div>
+
+  <div class="play-area hidden" id="runner-play">
+    <div class="hud">
+      <span>SCORE</span>
+      <span class="hud-score" id="runner-score">0</span>
+      <span>&nbsp;</span>
+    </div>
+    <canvas id="runner-canvas" width="800" height="300"></canvas>
+  </div>
+
+  <div class="result-overlay hidden" id="runner-result">
+    <h3 id="runner-result-text">RUN OVER</h3>
+    <p id="runner-result-sub"></p>
+    <button class="btn btn-pink" onclick="RunnerGame.reset()">Run Again</button>
+  </div>
+</div>
+
+<!-- ============ LEADERBOARD SCREEN ============ -->
+<div id="leaderboard-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:1000px;">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🏆 LEADERBOARD</div>
+  </div>
+  <div class="lb-grid" id="lb-grid"></div>
+</div>
+
+<script>
+/* =========================================================
+   AUTH
+   ========================================================= */
+const ACCOUNTS = {
+  "HUNT-RYU": "RYU_ISHIGORI",
+  "LJ-ALAN": "ALANBECKER",
+  "ARTHUR-JSD": "JSDBETTER",
+  "VAL_SASHA": "SASHA_WAYBRIGHT",
+  "ZANE_ICE": "HACKER",
+  "JEN_BEN": "BENNINGS",
+  "LUCA_SEA": "SEAMONSTER"
+};
+const USERS = Object.keys(ACCOUNTS);
+const SESSION_KEY = "level7_session_user";
+let currentUser = null;
+
+function attemptLogin(){
+  const u = document.getElementById('login-username').value.trim();
+  const p = document.getElementById('login-password').value;
+  const err = document.getElementById('login-error');
+  if(ACCOUNTS[u] && ACCOUNTS[u] === p){
+    currentUser = u;
+    sessionStorage.setItem(SESSION_KEY, u);
+    err.textContent = '';
+    document.getElementById('login-password').value = '';
+    afterLogin();
+  } else {
+    err.textContent = 'ACCESS DENIED — check your username & password.';
+  }
+}
+
+function afterLogin(){
+  document.getElementById('current-username').textContent = currentUser;
+  document.getElementById('dash-welcome-line').textContent = 'WELCOME BACK, ' + currentUser;
+  showScreen('dashboard-screen');
+}
+
+function logout(){
+  stopAllGames();
+  sessionStorage.removeItem(SESSION_KEY);
+  currentUser = null;
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').textContent = '';
+  showScreen('login-screen');
+}
+
+['login-username','login-password'].forEach(id=>{
+  document.getElementById(id).addEventListener('keydown', e=>{
+    if(e.key === 'Enter') attemptLogin();
+  });
+});
+
+/* =========================================================
+   SCREEN MANAGEMENT
+   ========================================================= */
+let currentScreen = 'login-screen';
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  currentScreen = id;
+  window.scrollTo(0,0);
+}
+function backToDashboard(){
+  stopAllGames();
+  showScreen('dashboard-screen');
+}
+function stopAllGames(){
+  SoccerGame.stop();
+  RacingGame.stop();
+  TankGame.stop();
+  RunnerGame.stop();
+}
+
+/* =========================================================
+   LEADERBOARD STORAGE
+   ========================================================= */
+const LB_KEY = 'level7_leaderboard_v1';
+
+function loadLeaderboard(){
+  let data = null;
+  try{ data = JSON.parse(localStorage.getItem(LB_KEY)); }catch(e){ data = null; }
+  if(!data || typeof data !== 'object') data = {};
+  USERS.forEach(u=>{
+    if(!data[u]) data[u] = {};
+    data[u].soccer = Object.assign({goals:0, saves:0, wins:0}, data[u].soccer || {});
+    data[u].racing = Object.assign({wins:0}, data[u].racing || {});
+    data[u].tank = Object.assign({wins:0}, data[u].tank || {});
+    data[u].runner = Object.assign({highScore:0}, data[u].runner || {});
+  });
+  return data;
+}
+function saveLeaderboard(data){
+  localStorage.setItem(LB_KEY, JSON.stringify(data));
+}
+function updateStat(game, mutator){
+  if(!currentUser) return;
+  const data = loadLeaderboard();
+  mutator(data[currentUser][game]);
+  saveLeaderboard(data);
+}
+
+function renderLeaderboard(){
+  const data = loadLeaderboard();
+  const grid = document.getElementById('lb-grid');
+
+  function rows(rowsArr, cols){
+    return rowsArr.map((r,i)=>{
+      const rankClass = i===0?'rank1':(i===1?'rank2':(i===2?'rank3':''));
+      const medal = i===0?'🥇':(i===1?'🥈':(i===2?'🥉':''));
+      const cells = cols.map(c=>`<td>${r[c]}</td>`).join('');
+      return `<tr class="${rankClass}"><td><span class="rank-medal">${medal}</span>${r.name}</td>${cells}</tr>`;
+    }).join('');
+  }
+
+  const soccerRows = USERS.map(u=>({name:u, ...data[u].soccer}))
+    .sort((a,b)=> b.wins-a.wins || b.goals-a.goals || b.saves-a.saves);
+  const racingRows = USERS.map(u=>({name:u, ...data[u].racing}))
+    .sort((a,b)=> b.wins-a.wins);
+  const tankRows = USERS.map(u=>({name:u, ...data[u].tank}))
+    .sort((a,b)=> b.wins-a.wins);
+  const runnerRows = USERS.map(u=>({name:u, ...data[u].runner}))
+    .sort((a,b)=> b.highScore-a.highScore);
+
+  grid.innerHTML = `
+    <div class="lb-card">
+      <h3>⚽ Street Soccer</h3>
+      <table>
+        <tr><th>Player</th><th>Wins</th><th>Goals</th><th>Saves</th></tr>
+        ${rows(soccerRows, ['wins','goals','saves'])}
+      </table>
+    </div>
+    <div class="lb-card">
+      <h3>🏎️ Apex Loop</h3>
+      <table>
+        <tr><th>Player</th><th>Wins</th></tr>
+        ${rows(racingRows, ['wins'])}
+      </table>
+    </div>
+    <div class="lb-card">
+      <h3>🛡️ Tank Duel</h3>
+      <table>
+        <tr><th>Player</th><th>Wins</th></tr>
+        ${rows(tankRows, ['wins'])}
+      </table>
+    </div>
+    <div class="lb-card">
+      <h3>🏃 Hop Runner</h3>
+      <table>
+        <tr><th>Player</th><th>High Score</th></tr>
+        ${rows(runnerRows, ['highScore'])}
+      </table>
+    </div>
+  `;
+}
+
+/* =========================================================
+   INPUT HANDLING
+   ========================================================= */
+const keys = new Set();
+function keyName(e){
+  if(e.key === ' ') return 'space';
+  return e.key.toLowerCase();
+}
+const SCROLL_BLOCK_KEYS = ['arrowup','arrowdown','arrowleft','arrowright','space'];
+
+document.addEventListener('keydown', e=>{
+  const name = keyName(e);
+  if(SCROLL_BLOCK_KEYS.includes(name) && currentScreen.endsWith('-screen') && currentScreen !== 'dashboard-screen' && currentScreen !== 'leaderboard-screen'){
+    e.preventDefault();
+  }
+  keys.add(name);
+  if(e.repeat) return;
+  if(currentScreen === 'soccer-screen') SoccerGame.onKeyPress(name);
+  else if(currentScreen === 'tank-screen') TankGame.onKeyPress(name);
+  else if(currentScreen === 'runner-screen') RunnerGame.onKeyPress(name);
+});
+document.addEventListener('keyup', e=>{
+  keys.delete(keyName(e));
+});
+
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+/* =========================================================
+   PLAYER-MADE SPRITES (tanks + cars)
+   ========================================================= */
+const SPRITES = {};
+function loadSprite(key, b64){
+  const img = new Image();
+  img.src = 'data:image/png;base64,' + b64;
+  SPRITES[key] = img;
+}
+loadSprite('redTank', 'iVBORw0KGgoAAAANSUhEUgAAAAwAAAAJCAYAAAAGuM1UAAAAg0lEQVR4nGNgQAJKN67+V7px9T8DHsCErBgbGx2wbBIT+8/AwMBQgCYBE79bVc/AwMDAcOrUKQYzMzMGFpiCCXaO+FwCB4wwk3ABv1evGJH5TLgU4rSBgYGBoX/CVAxbTp06xbB82UJGdHGW/glT/x87egDDJCtrBwYGBob/6JpItgEAbU0v/IXch8kAAAAASUVORK5CYII=');
+loadSprite('blueTank', 'iVBORw0KGgoAAAANSUhEUgAAAAwAAAAJCAYAAAAGuM1UAAAAg0lEQVR4nGNgQAJKN67+V7px9T8DHsCErBgbGx2waPuf/c/AwMDwHU0CJp7ieIKBgYGB4dSpUwxmZmYMLDAFnOU/8LkEDhhhJuECVzcaMyLzmXApxGkDAwMDQ/+EqRi2nDp1imH5soWM6OIs/ROm/j929ACGSVbWDgwMDAz/0TWRbAMAKdIxVeC0PcgAAAAASUVORK5CYII=');
+loadSprite('redCar', 'iVBORw0KGgoAAAANSUhEUgAAAAYAAAAHCAYAAAArkDztAAAAOElEQVR4nGNkYGD4f01engEZaD18yMAE4/js3Mbgs3MbXJIJXTUDAwPDNXl5hA50gFOCkaDl6AAA8RYNqXhYPe8AAAAASUVORK5CYII=');
+loadSprite('blueCar', 'iVBORw0KGgoAAAANSUhEUgAAAAYAAAAHCAYAAAArkDztAAAAOElEQVR4nGNkYGD4r+1/lgEZXN1ozMAE43zv5GD43skBl2RCV83AwMCg7X8WoQMd4JRgJGg5OgAA7YANqfUeofAAAAAASUVORK5CYII=');
+loadSprite('redPlayer', 'iVBORw0KGgoAAAANSUhEUgAAAAMAAAAICAYAAAA870V8AAAAK0lEQVR4nGP8f5XhPwMUsPx8HgNjMzDBGBwuSxCcH3tiGBj/MyD0wGXwcwD+oQoeLei9KgAAAABJRU5ErkJggg==');
+loadSprite('bluePlayer', 'iVBORw0KGgoAAAANSUhEUgAAAAMAAAAICAYAAAA870V8AAAALElEQVR4nGP8f5XhPwMUsPx8HgNjMzDBGBwuSxCcH3tiGBjF1l/7j6EMPwcAG2kKunBVbnUAAAAASUVORK5CYII=');
+loadSprite('soccerBall', 'iVBORw0KGgoAAAANSUhEUgAAAAkAAAAICAYAAAArzdW1AAAAR0lEQVR4nHWOwQ0AMQjDbMT+K3OfUqG251cUQkAWVVUMVAABogNqDyYFkGfDaN4yH+ZFjvtXsP34XZ/hfvzcbks1Wjwblv8BBZUeFkeBCjgAAAAASUVORK5CYII=');
+
+// Draws an image rotated around a custom pivot point (not necessarily the image center).
+// If mirrorForLeft is true, angles where the sprite would face "leftward" are rendered as a
+// horizontal mirror + partial rotation instead of a full rotation past 90°. This keeps
+// vertically-asymmetric art (like a tank turret drawn above the hull) from flipping upside-down
+// when the vehicle turns to face the other direction.
+// Returns true if it actually drew the sprite, false if the image isn't ready yet (caller should fall back).
+function drawRotatedSprite(ctx, img, x, y, angle, pivotX, pivotY, nativeW, nativeH, scale, rotateOffset, mirrorForLeft){
+  if(!img || !img.complete || img.naturalWidth === 0) return false;
+  ctx.save();
+  ctx.translate(x, y);
+  let a = angle + (rotateOffset||0);
+  if(mirrorForLeft){
+    while(a > Math.PI) a -= Math.PI*2;
+    while(a <= -Math.PI) a += Math.PI*2;
+    if(Math.cos(a) < 0){
+      ctx.rotate(a + Math.PI);
+      ctx.scale(-1,1);
+    } else {
+      ctx.rotate(a);
+    }
+  } else {
+    ctx.rotate(a);
+  }
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, -pivotX*scale, -pivotY*scale, nativeW*scale, nativeH*scale);
+  ctx.restore();
+  return true;
+}
+
+// Draws an image flipped horizontally (no rotation) based on facing direction (1 = right, -1 = left).
+// Used for side-view characters like the soccer players, where the art doesn't need to spin,
+// just mirror depending on which way the character is currently moving/facing.
+function drawFacingSprite(ctx, img, x, y, facing, pivotX, pivotY, nativeW, nativeH, scale){
+  if(!img || !img.complete || img.naturalWidth === 0) return false;
+  ctx.save();
+  ctx.translate(x, y);
+  if(facing < 0) ctx.scale(-1,1);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, -pivotX*scale, -pivotY*scale, nativeW*scale, nativeH*scale);
+  ctx.restore();
+  return true;
+}
+
+
+/* =========================================================
+   GAME 1: STREET SOCCER
+   ========================================================= */
+const SoccerGame = (function(){
+  const canvas = document.getElementById('soccer-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const GROUND_Y = 350;
+  const GRAVITY = 0.6;
+  const JUMP_VY = -11;
+  const MOVE_SPEED = 4;
+  const PW = 32, PH = 54;
+  const BALL_R = 9;
+  const KICK_RANGE = 46;
+  const KICK_POWER = 9;
+  const BALL_GRAVITY = 0.4;
+  const GOAL_TOP = 250, GOAL_BOTTOM = 350;
+  const GOAL_LINE_L = 14, GOAL_LINE_R = 786;
+  const WIN_SCORE = 5;
+
+  let mode = 'single';
+  let difficulty = 'medium';
+  let rafId = null;
+  let running = false;
+  let p1, p2, ball, scoreP1, scoreP2, matchGoalsP1, matchSavesP1, goalFlashTimer, goalFlashText;
+
+  function setMode(m){
+    mode = m;
+    document.getElementById('soccer-mode-single').classList.toggle('selected', m==='single');
+    document.getElementById('soccer-mode-multi').classList.toggle('selected', m==='multi');
+    document.getElementById('soccer-diff-section').classList.toggle('hidden', m!=='single');
+    document.getElementById('soccer-p2-label').textContent = m==='single' ? 'BOT' : 'PLAYER 2';
+  }
+  function setDifficulty(d){
+    difficulty = d;
+    ['easy','medium','hard'].forEach(k=>{
+      document.getElementById('soccer-diff-'+k).classList.toggle('selected', k===d);
+    });
+  }
+
+  function freshState(){
+    p1 = {x:200, y:GROUND_Y-PH, vx:0, vy:0, onGround:true, facing:1};
+    p2 = {x:560, y:GROUND_Y-PH, vx:0, vy:0, onGround:true, facing:-1};
+    ball = {x:400, y:GROUND_Y-BALL_R, vx:0, vy:0, spin:0};
+    scoreP1 = 0; scoreP2 = 0;
+    matchGoalsP1 = 0; matchSavesP1 = 0;
+    goalFlashTimer = 0; goalFlashText = '';
+    updateHud();
+  }
+
+  function updateHud(){
+    document.getElementById('soccer-score').textContent = scoreP1 + ' : ' + scoreP2;
+  }
+
+  function reset(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId);
+    document.getElementById('soccer-setup').classList.remove('hidden');
+    document.getElementById('soccer-play').classList.add('hidden');
+    document.getElementById('soccer-result').classList.add('hidden');
+    setMode(mode);
+    setDifficulty(difficulty);
+  }
+
+  function start(){
+    document.getElementById('soccer-setup').classList.add('hidden');
+    document.getElementById('soccer-result').classList.add('hidden');
+    document.getElementById('soccer-play').classList.remove('hidden');
+    freshState();
+    running = true;
+    loop();
+  }
+
+  function stop(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId);
+  }
+
+  function onKeyPress(name){
+    if(!running) return;
+    if(name === 'w' && p1.onGround){ p1.vy = JUMP_VY; p1.onGround = false; }
+    if(name === 's') tryKick(true);
+    if(mode === 'multi'){
+      if(name === 'arrowup' && p2.onGround){ p2.vy = JUMP_VY; p2.onGround = false; }
+      if(name === 'arrowdown') tryKick(false);
+    }
+  }
+
+  function tryKick(isP1){
+    const player = isP1 ? p1 : p2;
+    const cx = player.x + PW/2, cy = player.y + PH/2;
+    const dist = Math.hypot(ball.x - cx, ball.y - cy);
+    if(dist <= KICK_RANGE){
+      const dir = isP1 ? 1 : -1;
+      if(isP1){
+        const nearOwnGoal = ball.x < 150;
+        const movingTowardOwnGoal = ball.vx < 0;
+        if(nearOwnGoal && movingTowardOwnGoal) matchSavesP1++;
+      }
+      ball.vx = dir * KICK_POWER + (Math.random()*2 - 1);
+      ball.vy = -4 - Math.random()*2;
+      return true;
+    }
+    return false;
+  }
+
+  function applyPlayerPhysics(player, vx){
+    player.vx = vx;
+    if(vx > 0) player.facing = 1;
+    else if(vx < 0) player.facing = -1;
+    player.x = clamp(player.x + vx, 16, W-16-PW);
+    player.vy += GRAVITY;
+    player.y += player.vy;
+    if(player.y + PH >= GROUND_Y){
+      player.y = GROUND_Y - PH;
+      player.vy = 0;
+      player.onGround = true;
+    } else {
+      player.onGround = false;
+    }
+  }
+
+  function p1Input(){
+    if(keys.has('a')) return -MOVE_SPEED;
+    if(keys.has('d')) return MOVE_SPEED;
+    return 0;
+  }
+  function p2Input(){
+    if(keys.has('arrowleft')) return -MOVE_SPEED;
+    if(keys.has('arrowright')) return MOVE_SPEED;
+    return 0;
+  }
+
+  function botUpdate(){
+    let speed, jumpChance, kickChance;
+    if(difficulty === 'easy'){ speed = 1.4; jumpChance = 0.006; kickChance = 0.2; }
+    else if(difficulty === 'medium'){ speed = 2.2; jumpChance = 0.012; kickChance = 0.32; }
+    else { speed = 3.1; jumpChance = 0.025; kickChance = 0.48; }
+
+    // Defensive positioning: when the ball is deep in P1's territory, retreat toward
+    // home turf near its own goal instead of always charging all the way forward.
+    const homeX = 580;
+    const targetX = (ball.x < 380 ? homeX : ball.x) - PW/2;
+
+    if(p2.x + PW/2 < targetX - 6) p2.vx = speed;
+    else if(p2.x + PW/2 > targetX + 6) p2.vx = -speed;
+    else p2.vx = 0;
+
+    const distX = Math.abs((p2.x+PW/2) - ball.x);
+    if(p2.onGround && ball.y < p2.y && distX < 60 && Math.random() < jumpChance){
+      p2.vy = JUMP_VY; p2.onGround = false;
+    }
+
+    const distToBall = Math.hypot((p2.x+PW/2)-ball.x, (p2.y+PH/2)-ball.y);
+    if(distToBall <= KICK_RANGE && Math.random() < kickChance) tryKick(false);
+  }
+
+  function resetPositions(){
+    ball.x = 400; ball.y = GROUND_Y - BALL_R; ball.vx = 0; ball.vy = 0; ball.spin = 0;
+    p1.x = 200; p1.y = GROUND_Y - PH; p1.vy = 0; p1.facing = 1;
+    p2.x = 560; p2.y = GROUND_Y - PH; p2.vy = 0; p2.facing = -1;
+  }
+
+  function checkWin(){
+    if(scoreP1 >= WIN_SCORE) endMatch(true);
+    else if(scoreP2 >= WIN_SCORE) endMatch(false);
+  }
+
+  function endMatch(p1Won){
+    running = false;
+    updateStat('soccer', s=>{
+      s.goals += matchGoalsP1;
+      s.saves += matchSavesP1;
+      if(p1Won) s.wins += 1;
+    });
+    const oppName = mode==='single' ? 'the bot' : 'Player 2';
+    document.getElementById('soccer-result-text').textContent = p1Won ? 'YOU WIN!' : (mode==='single' ? 'BOT WINS' : 'PLAYER 2 WINS');
+    document.getElementById('soccer-result-sub').textContent = `Final score ${scoreP1} : ${scoreP2} vs ${oppName}.`;
+    document.getElementById('soccer-play').classList.add('hidden');
+    document.getElementById('soccer-result').classList.remove('hidden');
+  }
+
+  function update(){
+    applyPlayerPhysics(p1, p1Input());
+    if(mode === 'multi'){
+      applyPlayerPhysics(p2, p2Input());
+    } else {
+      botUpdate();
+      applyPlayerPhysics(p2, p2.vx);
+    }
+
+    ball.vy += BALL_GRAVITY;
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+    ball.vx *= 0.992;
+    ball.spin += ball.vx * 0.05;
+
+    if(ball.y + BALL_R >= GROUND_Y){
+      ball.y = GROUND_Y - BALL_R;
+      ball.vy = -ball.vy * 0.42;
+      if(Math.abs(ball.vy) < 0.8) ball.vy = 0;
+    }
+    if(ball.y - BALL_R <= 0){
+      ball.y = BALL_R;
+      ball.vy = -ball.vy * 0.5;
+    }
+
+    const inGoalY = ball.y > GOAL_TOP && ball.y < GOAL_BOTTOM;
+    if(ball.x - BALL_R <= GOAL_LINE_L && inGoalY){
+      scoreP2++;
+      resetPositions();
+      updateHud();
+      checkWin();
+      return;
+    }
+    if(ball.x + BALL_R >= GOAL_LINE_R && inGoalY){
+      scoreP1++; matchGoalsP1++;
+      resetPositions();
+      updateHud();
+      checkWin();
+      return;
+    }
+    if(ball.x - BALL_R <= 0 && !inGoalY){ ball.x = BALL_R; ball.vx = -ball.vx*0.6; }
+    if(ball.x + BALL_R >= W && !inGoalY){ ball.x = W-BALL_R; ball.vx = -ball.vx*0.6; }
+  }
+
+  function drawField(){
+    ctx.fillStyle = '#0e3a24';
+    ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(10,10,W-20,H-20);
+    ctx.beginPath();
+    ctx.moveTo(W/2,10); ctx.lineTo(W/2,H-10); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(W/2,H/2,45,0,Math.PI*2); ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(0, GOAL_TOP, 16, GOAL_BOTTOM-GOAL_TOP);
+    ctx.fillRect(W-16, GOAL_TOP, 16, GOAL_BOTTOM-GOAL_TOP);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.strokeRect(0, GOAL_TOP, 16, GOAL_BOTTOM-GOAL_TOP);
+    ctx.strokeRect(W-16, GOAL_TOP, 16, GOAL_BOTTOM-GOAL_TOP);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath(); ctx.moveTo(0,GROUND_Y); ctx.lineTo(W,GROUND_Y); ctx.stroke();
+  }
+
+  function drawPlayer(p, isP1, color, label){
+    const img = SPRITES[isP1 ? 'redPlayer' : 'bluePlayer'];
+    const footX = p.x + PW/2, footY = p.y + PH;
+    const drawn = drawFacingSprite(ctx, img, footX, footY, p.facing, 1.5, 8, 3, 8, 5.6);
+    if(!drawn){
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(p.x, p.y, PW, PH, 6) : ctx.rect(p.x,p.y,PW,PH);
+      ctx.fill();
+      ctx.fillStyle = '#04060a';
+      ctx.beginPath();
+      ctx.arc(p.x+PW/2, p.y+12, 9, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, p.x+PW/2, p.y-6);
+  }
+
+  function render(){
+    drawField();
+    drawPlayer(p1, true, '#2de2c5', 'P1');
+    drawPlayer(p2, false, '#ff3d8a', mode==='single' ? 'BOT' : 'P2');
+    const ballDrawn = drawRotatedSprite(ctx, SPRITES.soccerBall, ball.x, ball.y, ball.spin, 4.5, 4, 9, 8, 2.2, 0, false);
+    if(!ballDrawn){
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.stroke();
+    }
+  }
+
+  function loop(){
+    if(!running) return;
+    update();
+    if(running) render();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  setMode('single');
+  setDifficulty('medium');
+
+  return {setMode, setDifficulty, start, stop, reset, onKeyPress};
+})();
+
+/* =========================================================
+   GAME 2: APEX LOOP (RACING)
+   ========================================================= */
+const RacingGame = (function(){
+  const canvas = document.getElementById('racing-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const CX = W/2, CY = H/2;
+
+  const OUTER_RX = 350, OUTER_RY = 250;
+  const INNER_RX = 170, INNER_RY = 110;
+  const BASE_SPEED = 1.8;
+  const TURN_RATE = 0.045;
+  const OFFTRACK_MULT = 0.45;
+  const LAPS_TO_WIN = 3;
+
+  let mode = 'single';
+  let difficulty = 'medium';
+  let rafId = null;
+  let running = false;
+  let p1, p2, frameCount;
+
+  function setMode(m){
+    mode = m;
+    document.getElementById('racing-mode-single').classList.toggle('selected', m==='single');
+    document.getElementById('racing-mode-multi').classList.toggle('selected', m==='multi');
+    document.getElementById('racing-diff-section').classList.toggle('hidden', m!=='single');
+    document.getElementById('racing-p2-label').textContent = (m==='single' ? 'BOT' : 'RIVAL') + ' · LAP 0/3';
+  }
+  function setDifficulty(d){
+    difficulty = d;
+    ['easy','medium','hard'].forEach(k=>{
+      document.getElementById('racing-diff-'+k).classList.toggle('selected', k===d);
+    });
+  }
+
+  function trackPoint(angle, t){
+    const ox = CX + OUTER_RX*Math.cos(angle), oy = CY + OUTER_RY*Math.sin(angle);
+    const ix = CX + INNER_RX*Math.cos(angle), iy = CY + INNER_RY*Math.sin(angle);
+    return { x: ix + t*(ox-ix), y: iy + t*(oy-iy) };
+  }
+
+  function spawnCar(tLane){
+    const p = trackPoint(0, tLane);
+    return {x:p.x, y:p.y, heading:Math.PI/2, prevAngle:0, totalAngle:0, laps:0};
+  }
+
+  function freshState(){
+    p1 = spawnCar(0.38);
+    p2 = spawnCar(0.62);
+    frameCount = 0;
+    updateHud();
+  }
+
+  function updateHud(){
+    document.getElementById('racing-p1-label').textContent = 'YOU · LAP ' + Math.min(p1.laps,LAPS_TO_WIN) + '/' + LAPS_TO_WIN;
+    document.getElementById('racing-p2-label').textContent = (mode==='single'?'BOT':'RIVAL') + ' · LAP ' + Math.min(p2.laps,LAPS_TO_WIN) + '/' + LAPS_TO_WIN;
+  }
+
+  function reset(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId);
+    document.getElementById('racing-setup').classList.remove('hidden');
+    document.getElementById('racing-play').classList.add('hidden');
+    document.getElementById('racing-result').classList.add('hidden');
+    setMode(mode);
+    setDifficulty(difficulty);
+  }
+
+  function start(){
+    document.getElementById('racing-setup').classList.add('hidden');
+    document.getElementById('racing-result').classList.add('hidden');
+    document.getElementById('racing-play').classList.remove('hidden');
+    freshState();
+    running = true;
+    loop();
+  }
+
+  function stop(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId);
+  }
+
+  function onKeyPress(name){ /* turning handled continuously in update */ }
+
+  function offTrackMultiplier(x,y){
+    const dOuter = Math.pow((x-CX)/OUTER_RX,2) + Math.pow((y-CY)/OUTER_RY,2);
+    const dInner = Math.pow((x-CX)/INNER_RX,2) + Math.pow((y-CY)/INNER_RY,2);
+    if(dOuter > 1 || dInner < 1) return OFFTRACK_MULT;
+    return 1;
+  }
+
+  function moveCar(car, turnDir, speedMult){
+    car.heading += turnDir * TURN_RATE;
+    const penalty = offTrackMultiplier(car.x, car.y);
+    const speed = BASE_SPEED * speedMult * penalty;
+    car.x += Math.cos(car.heading) * speed;
+    car.y += Math.sin(car.heading) * speed;
+    car.x = clamp(car.x, 5, W-5);
+    car.y = clamp(car.y, 5, H-5);
+
+    const rawAngle = Math.atan2(car.y-CY, car.x-CX);
+    let delta = rawAngle - car.prevAngle;
+    while(delta > Math.PI) delta -= Math.PI*2;
+    while(delta < -Math.PI) delta += Math.PI*2;
+    car.totalAngle += delta;
+    car.prevAngle = rawAngle;
+    car.laps = Math.max(0, Math.floor(car.totalAngle / (Math.PI*2)));
+  }
+
+  function botTurnDir(car, targetT, lookahead){
+    const rawAngle = Math.atan2(car.y-CY, car.x-CX);
+    const target = trackPoint(rawAngle + lookahead, targetT);
+    const desiredHeading = Math.atan2(target.y-car.y, target.x-car.x);
+    let diff = desiredHeading - car.heading;
+    while(diff > Math.PI) diff -= Math.PI*2;
+    while(diff < -Math.PI) diff += Math.PI*2;
+    if(Math.abs(diff) < 0.03) return 0;
+    return diff > 0 ? 1 : -1;
+  }
+
+  function update(){
+    frameCount++;
+    let p1Turn = 0;
+    if(keys.has('a')) p1Turn = -1;
+    else if(keys.has('d')) p1Turn = 1;
+    moveCar(p1, p1Turn, 1);
+
+    if(mode === 'multi'){
+      let p2Turn = 0;
+      if(keys.has('arrowleft')) p2Turn = -1;
+      else if(keys.has('arrowright')) p2Turn = 1;
+      moveCar(p2, p2Turn, 1);
+    } else {
+      let targetT, speedMult, lookahead;
+      if(difficulty === 'easy'){ targetT = 0.5 + Math.sin(frameCount*0.01)*0.45; speedMult = 0.82; lookahead = 0.22; }
+      else if(difficulty === 'medium'){ targetT = 0.35; speedMult = 1.0; lookahead = 0.18; }
+      else { targetT = 0.12; speedMult = 1.22; lookahead = 0.15; }
+      const dir = botTurnDir(p2, targetT, lookahead);
+      moveCar(p2, dir, speedMult);
+    }
+
+    updateHud();
+
+    if(p1.laps >= LAPS_TO_WIN) endRace(true);
+    else if(p2.laps >= LAPS_TO_WIN) endRace(false);
+  }
+
+  function endRace(p1Won){
+    running = false;
+    updateStat('racing', s=>{ if(p1Won) s.wins += 1; });
+    document.getElementById('racing-result-text').textContent = p1Won ? 'YOU WIN THE RACE!' : (mode==='single' ? 'BOT WINS THE RACE' : 'RIVAL WINS THE RACE');
+    document.getElementById('racing-result-sub').textContent = 'You: ' + Math.min(p1.laps,LAPS_TO_WIN) + ' laps · Opponent: ' + Math.min(p2.laps,LAPS_TO_WIN) + ' laps.';
+    document.getElementById('racing-play').classList.add('hidden');
+    document.getElementById('racing-result').classList.remove('hidden');
+  }
+
+  function drawEllipse(rx, ry, color, width){
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.ellipse(CX, CY, rx, ry, 0, 0, Math.PI*2);
+    ctx.stroke();
+  }
+
+  function drawCar(car, isP1, color, label){
+    const img = SPRITES[isP1 ? 'redCar' : 'blueCar'];
+    const drawn = drawRotatedSprite(ctx, img, car.x, car.y, car.heading, 3, 3.5, 6, 7, 2.9, Math.PI/2);
+    if(!drawn){
+      ctx.save();
+      ctx.translate(car.x, car.y);
+      ctx.rotate(car.heading);
+      ctx.fillStyle = color;
+      ctx.fillRect(-8,-9,20,18);
+      ctx.fillStyle = '#04060a';
+      ctx.fillRect(8,-9,4,18);
+      ctx.restore();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, car.x, car.y-20);
+  }
+
+  function render(){
+    ctx.fillStyle = '#0a2e1c';
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#123a24';
+    ctx.beginPath();
+    ctx.ellipse(CX,CY, OUTER_RX+18, OUTER_RY+18, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#2a2f3a';
+    ctx.beginPath();
+    ctx.ellipse(CX,CY, OUTER_RX, OUTER_RY, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#0a2e1c';
+    ctx.beginPath();
+    ctx.ellipse(CX,CY, INNER_RX, INNER_RY, 0, 0, Math.PI*2);
+    ctx.fill();
+    drawEllipse(OUTER_RX, OUTER_RY, 'rgba(255,255,255,0.5)', 3);
+    drawEllipse(INNER_RX, INNER_RY, 'rgba(255,255,255,0.5)', 3);
+
+    const fx1 = trackPoint(0,0), fx2 = trackPoint(0,1);
+    ctx.strokeStyle = '#ffc857';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(fx1.x,fx1.y); ctx.lineTo(fx2.x,fx2.y); ctx.stroke();
+
+    drawCar(p1, true, '#2de2c5', 'YOU');
+    drawCar(p2, false, '#ff3d8a', mode==='single'?'BOT':'P2');
+  }
+
+  function loop(){
+    if(!running) return;
+    update();
+    if(running) render();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  setMode('single');
+  setDifficulty('medium');
+
+  return {setMode, setDifficulty, start, stop, reset, onKeyPress};
+})();
+
+/* =========================================================
+   GAME 3: TANK DUEL
+   ========================================================= */
+const TankGame = (function(){
+  const canvas = document.getElementById('tank-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const TANK_HALF = 14;
+  const FORWARD_SPEED = 2.2;
+  const ROTATE_SPEED = 0.045;
+  const BULLET_SPEED = 7;
+  const BULLET_RADIUS = 4;
+  const HIT_RADIUS = 18;
+  const COOLDOWN_FRAMES = 40;
+  const WIN_HITS = 3;
+
+  const OBSTACLES = [
+    {x:350, y:140, w:100, h:22},
+    {x:350, y:338, w:100, h:22},
+    {x:378, y:228, w:44, h:44}
+  ];
+
+  let mode = 'single';
+  let difficulty = 'medium';
+  let rafId = null;
+  let running = false;
+  let p1, p2, bullets, hitsP1, hitsP2, botStuckTimer;
+
+  function setMode(m){
+    mode = m;
+    document.getElementById('tank-mode-single').classList.toggle('selected', m==='single');
+    document.getElementById('tank-mode-multi').classList.toggle('selected', m==='multi');
+    document.getElementById('tank-diff-section').classList.toggle('hidden', m!=='single');
+  }
+  function setDifficulty(d){
+    difficulty = d;
+    ['easy','medium','hard'].forEach(k=>{
+      document.getElementById('tank-diff-'+k).classList.toggle('selected', k===d);
+    });
+  }
+
+  function spawnPositions(){
+    p1 = {x:70, y:H/2, angle:0, cooldown:0};
+    p2 = {x:W-70, y:H/2, angle:Math.PI, cooldown:0};
+  }
+
+  function freshState(){
+    spawnPositions();
+    bullets = [];
+    hitsP1 = 0; hitsP2 = 0;
+    botStuckTimer = 0;
+    updateHud();
+  }
+
+  function updateHud(){
+    document.getElementById('tank-p1-label').textContent = 'PLAYER 1: ' + hitsP1;
+    document.getElementById('tank-p2-label').textContent = (mode==='single'?'BOT: ':'PLAYER 2: ') + hitsP2;
+  }
+
+  function reset(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId);
+    document.getElementById('tank-setup').classList.remove('hidden');
+    document.getElementById('tank-play').classList.add('hidden');
+    document.getElementById('tank-result').classList.add('hidden');
+    setMode(mode);
+    setDifficulty(difficulty);
+  }
+
+  function start(){
+    document.getElementById('tank-setup').classList.add('hidden');
+    document.getElementById('tank-result').classList.add('hidden');
+    document.getElementById('tank-play').classList.remove('hidden');
+    freshState();
+    running = true;
+    loop();
+  }
+
+  function stop(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId);
+  }
+
+  function onKeyPress(name){
+    if(!running) return;
+    if(name === 'space') fire(p1, true);
+    if(mode === 'multi' && name === 'l') fire(p2, false);
+  }
+
+  function rectsOverlap(ax,ay,aw,ah, bx,by,bw,bh){
+    return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+  }
+
+  function blockedAt(x,y){
+    if(x-TANK_HALF < 6 || x+TANK_HALF > W-6 || y-TANK_HALF < 6 || y+TANK_HALF > H-6) return true;
+    for(const o of OBSTACLES){
+      if(rectsOverlap(x-TANK_HALF,y-TANK_HALF,TANK_HALF*2,TANK_HALF*2, o.x,o.y,o.w,o.h)) return true;
+    }
+    return false;
+  }
+
+  function moveTank(tank, forwardDir, rotateDir, speedMult, rotateMult){
+    tank.angle += rotateDir * ROTATE_SPEED * rotateMult;
+    if(forwardDir !== 0){
+      const nx = tank.x + Math.cos(tank.angle)*FORWARD_SPEED*forwardDir*speedMult;
+      const ny = tank.y + Math.sin(tank.angle)*FORWARD_SPEED*forwardDir*speedMult;
+      if(!blockedAt(nx,ny)){ tank.x = nx; tank.y = ny; }
+    }
+    if(tank.cooldown > 0) tank.cooldown--;
+  }
+
+  function fire(tank, isP1){
+    if(tank.cooldown > 0) return;
+    tank.cooldown = COOLDOWN_FRAMES;
+    const fx = tank.x + Math.cos(tank.angle)*(TANK_HALF+6);
+    const fy = tank.y + Math.sin(tank.angle)*(TANK_HALF+6);
+    bullets.push({
+      x:fx, y:fy,
+      vx:Math.cos(tank.angle)*BULLET_SPEED,
+      vy:Math.sin(tank.angle)*BULLET_SPEED,
+      owner: isP1 ? 'p1' : 'p2',
+      life: 120
+    });
+  }
+
+  function botUpdate(){
+    let aimMult, fireChance, speedMult, rotateMult, keepDist;
+    if(difficulty === 'easy'){ aimMult=0.45; fireChance=0.3; speedMult=0.55; rotateMult=0.55; keepDist=110; }
+    else if(difficulty === 'medium'){ aimMult=0.7; fireChance=0.5; speedMult=0.75; rotateMult=0.75; keepDist=130; }
+    else { aimMult=0.95; fireChance=0.7; speedMult=0.95; rotateMult=1.0; keepDist=150; }
+
+    const angleToPlayer = Math.atan2(p1.y-p2.y, p1.x-p2.x);
+    let diff = angleToPlayer - p2.angle;
+    while(diff > Math.PI) diff -= Math.PI*2;
+    while(diff < -Math.PI) diff += Math.PI*2;
+
+    const rotateDir = Math.abs(diff) < 0.04 ? 0 : (diff > 0 ? 1 : -1);
+    const dist = Math.hypot(p1.x-p2.x, p1.y-p2.y);
+    let forwardDir = 0;
+
+    if(botStuckTimer > 0){
+      botStuckTimer--;
+      forwardDir = -1;
+    } else {
+      if(Math.abs(diff) < 0.6){
+        if(dist > keepDist) forwardDir = 1;
+        else if(dist < keepDist*0.6) forwardDir = -1;
+      }
+      // If the move we're about to make would just ram an obstacle/wall, back off
+      // and turn instead of idling stuck against it.
+      if(forwardDir !== 0){
+        const testX = p2.x + Math.cos(p2.angle)*FORWARD_SPEED*forwardDir*speedMult;
+        const testY = p2.y + Math.sin(p2.angle)*FORWARD_SPEED*forwardDir*speedMult;
+        if(blockedAt(testX, testY)){
+          forwardDir = -forwardDir;
+          botStuckTimer = 25;
+        }
+      }
+    }
+
+    moveTank(p2, forwardDir, rotateDir, speedMult, rotateMult);
+
+    const fireThreshold = 0.18 / aimMult;
+    if(Math.abs(diff) < fireThreshold && Math.random() < fireChance){
+      fire(p2, false);
+    }
+  }
+
+  function update(){
+    let p1Forward = 0, p1Rotate = 0;
+    if(keys.has('w')) p1Forward = 1;
+    else if(keys.has('s')) p1Forward = -1;
+    if(keys.has('a')) p1Rotate = -1;
+    else if(keys.has('d')) p1Rotate = 1;
+    moveTank(p1, p1Forward, p1Rotate, 1, 1);
+
+    if(mode === 'multi'){
+      let p2Forward = 0, p2Rotate = 0;
+      if(keys.has('arrowup')) p2Forward = 1;
+      else if(keys.has('arrowdown')) p2Forward = -1;
+      if(keys.has('arrowleft')) p2Rotate = -1;
+      else if(keys.has('arrowright')) p2Rotate = 1;
+      moveTank(p2, p2Forward, p2Rotate, 1, 1);
+    } else {
+      botUpdate();
+    }
+
+    for(let i=bullets.length-1; i>=0; i--){
+      const b = bullets[i];
+      b.x += b.vx; b.y += b.vy; b.life--;
+      let remove = false;
+      if(b.x < 0 || b.x > W || b.y < 0 || b.y > H) remove = true;
+      if(b.life <= 0) remove = true;
+      for(const o of OBSTACLES){
+        if(b.x > o.x && b.x < o.x+o.w && b.y > o.y && b.y < o.y+o.h){ remove = true; break; }
+      }
+      if(!remove){
+        const targetTank = b.owner === 'p1' ? p2 : p1;
+        const d = Math.hypot(b.x-targetTank.x, b.y-targetTank.y);
+        if(d <= HIT_RADIUS){
+          remove = true;
+          if(b.owner === 'p1'){ hitsP1++; } else { hitsP2++; }
+          updateHud();
+          spawnPositions();
+          if(hitsP1 >= WIN_HITS){ endMatch(true); return; }
+          if(hitsP2 >= WIN_HITS){ endMatch(false); return; }
+        }
+      }
+      if(remove) bullets.splice(i,1);
+    }
+  }
+
+  function endMatch(p1Won){
+    running = false;
+    updateStat('tank', s=>{ if(p1Won) s.wins += 1; });
+    document.getElementById('tank-result-text').textContent = p1Won ? 'YOU WIN THE DUEL!' : (mode==='single'?'BOT WINS THE DUEL':'PLAYER 2 WINS THE DUEL');
+    document.getElementById('tank-result-sub').textContent = 'Final hits ' + hitsP1 + ' : ' + hitsP2 + '.';
+    document.getElementById('tank-play').classList.add('hidden');
+    document.getElementById('tank-result').classList.remove('hidden');
+  }
+
+  function drawTank(tank, isP1, color, label){
+    const img = SPRITES[isP1 ? 'redTank' : 'blueTank'];
+    const drawn = drawRotatedSprite(ctx, img, tank.x, tank.y, tank.angle, 3.5, 4.5, 12, 9, 2.8, 0, true);
+    if(!drawn){
+      ctx.save();
+      ctx.translate(tank.x, tank.y);
+      ctx.rotate(tank.angle);
+      ctx.fillStyle = color;
+      ctx.fillRect(-TANK_HALF, -TANK_HALF, TANK_HALF*2, TANK_HALF*2);
+      ctx.fillStyle = '#0a0d13';
+      ctx.fillRect(0, -3, TANK_HALF+10, 6);
+      ctx.restore();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, tank.x, tank.y - TANK_HALF - 8);
+  }
+
+  function render(){
+    ctx.fillStyle = '#0d1018';
+    ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    for(let gx=0; gx<W; gx+=40){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    for(let gy=0; gy<H; gy+=40){ ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.strokeRect(6,6,W-12,H-12);
+
+    ctx.fillStyle = '#3a4150';
+    OBSTACLES.forEach(o=> ctx.fillRect(o.x,o.y,o.w,o.h));
+
+    drawTank(p1, true, '#2de2c5', 'P1');
+    drawTank(p2, false, '#ff3d8a', mode==='single'?'BOT':'P2');
+
+    ctx.fillStyle = '#ffe27a';
+    bullets.forEach(b=>{
+      ctx.beginPath();
+      ctx.arc(b.x,b.y,BULLET_RADIUS,0,Math.PI*2);
+      ctx.fill();
+    });
+  }
+
+  function loop(){
+    if(!running) return;
+    update();
+    if(running) render();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  setMode('single');
+  setDifficulty('medium');
+
+  return {setMode, setDifficulty, start, stop, reset, onKeyPress};
+})();
+
+/* =========================================================
+   GAME 4: HOP RUNNER
+   ========================================================= */
+const RunnerGame = (function(){
+  const canvas = document.getElementById('runner-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  const GROUND_Y = 240;
+  const GRAVITY = 0.55;
+  const JUMP_VY = -10;
+  const PLAYER_X = 80, PLAYER_W = 28, PLAYER_H = 42;
+
+  let rafId = null;
+  let running = false;
+  let player, obstacles, score, spawnTimer, frameCount;
+
+  function freshState(){
+    player = {y:GROUND_Y-PLAYER_H, vy:0, onGround:true};
+    obstacles = [];
+    score = 0;
+    spawnTimer = 60;
+    frameCount = 0;
+    updateHud();
+  }
+
+  function updateHud(){
+    document.getElementById('runner-score').textContent = score;
+  }
+
+  function reset(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId);
+    document.getElementById('runner-setup').classList.remove('hidden');
+    document.getElementById('runner-play').classList.add('hidden');
+    document.getElementById('runner-result').classList.add('hidden');
+  }
+
+  function start(){
+    document.getElementById('runner-setup').classList.add('hidden');
+    document.getElementById('runner-result').classList.add('hidden');
+    document.getElementById('runner-play').classList.remove('hidden');
+    freshState();
+    running = true;
+    loop();
+  }
+
+  function stop(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId);
+  }
+
+  function onKeyPress(name){
+    if(!running) return;
+    if((name === 'space' || name === 'arrowup') && player.onGround){
+      player.vy = JUMP_VY;
+      player.onGround = false;
+    }
+  }
+
+  function currentSpeed(){ return Math.min(4 + score*0.08, 10); }
+  function currentSpawnInterval(){ return Math.max(40, 95 - score*1.1); }
+
+  function update(){
+    frameCount++;
+    player.vy += GRAVITY;
+    player.y += player.vy;
+    if(player.y + PLAYER_H >= GROUND_Y){
+      player.y = GROUND_Y - PLAYER_H;
+      player.vy = 0;
+      player.onGround = true;
+    }
+
+    spawnTimer--;
+    if(spawnTimer <= 0){
+      const h = 28 + Math.random()*24;
+      obstacles.push({x:W+10, w:18, h:h, passed:false});
+      spawnTimer = currentSpawnInterval();
+    }
+
+    const speed = currentSpeed();
+    for(let i=obstacles.length-1; i>=0; i--){
+      const o = obstacles[i];
+      o.x -= speed;
+      if(!o.passed && o.x + o.w < PLAYER_X){
+        o.passed = true;
+        score++;
+        updateHud();
+      }
+      if(o.x < -40) obstacles.splice(i,1);
+    }
+
+    for(const o of obstacles){
+      const oy = GROUND_Y - o.h;
+      const overlapX = PLAYER_X < o.x + o.w && PLAYER_X + PLAYER_W > o.x;
+      const overlapY = player.y < oy + o.h && player.y + PLAYER_H > oy;
+      if(overlapX && overlapY){
+        gameOver();
+        return;
+      }
+    }
+  }
+
+  function gameOver(){
+    running = false;
+    updateStat('runner', s=>{ if(score > s.highScore) s.highScore = score; });
+    document.getElementById('runner-result-text').textContent = 'RUN OVER';
+    document.getElementById('runner-result-sub').textContent = 'You cleared ' + score + ' obstacle' + (score===1?'':'s') + '.';
+    document.getElementById('runner-play').classList.add('hidden');
+    document.getElementById('runner-result').classList.remove('hidden');
+  }
+
+  function render(){
+    ctx.fillStyle = '#10131c';
+    ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.moveTo(0,GROUND_Y); ctx.lineTo(W,GROUND_Y); ctx.stroke();
+
+    ctx.fillStyle = '#8b8bff';
+    ctx.fillRect(PLAYER_X, player.y, PLAYER_W, PLAYER_H);
+    ctx.fillStyle = '#04060a';
+    ctx.beginPath();
+    ctx.arc(PLAYER_X+PLAYER_W/2, player.y+8, 7, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ff3d8a';
+    obstacles.forEach(o=>{
+      const oy = GROUND_Y - o.h;
+      ctx.beginPath();
+      ctx.moveTo(o.x, GROUND_Y);
+      ctx.lineTo(o.x + o.w/2, oy);
+      ctx.lineTo(o.x + o.w, GROUND_Y);
+      ctx.closePath();
+      ctx.fill();
+    });
+  }
+
+  function loop(){
+    if(!running) return;
+    update();
+    if(running) render();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  return {start, stop, reset, onKeyPress};
+})();
+
+/* =========================================================
+   INIT
+   ========================================================= */
+(function init(){
+  const saved = sessionStorage.getItem(SESSION_KEY);
+  if(saved && ACCOUNTS[saved]){
+    currentUser = saved;
+    afterLogin();
+  } else {
+    showScreen('login-screen');
+  }
+})();
+</script>
+</body>
+</html>
