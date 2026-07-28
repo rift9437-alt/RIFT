@@ -1,0 +1,16 @@
+{
+  "name": "level7-leaderboard-server",
+  "version": "1.0.0",
+  "description": "Shared live leaderboard backend for the Level 7 arcade page",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "pg": "^8.12.0"
+  }
+}
