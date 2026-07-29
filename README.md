@@ -4,6 +4,8 @@ This is a tiny backend that makes the arcade leaderboard **shared and live**
 across every player, instead of each browser keeping its own private copy
 in `localStorage`.
 
+https://rift-1-edfr.onrender.com/
+
 ## How it works
 
 - `server.js` is a small Express app that does **two jobs**:
