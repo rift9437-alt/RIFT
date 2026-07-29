@@ -1,4 +1,4 @@
-# Level 7 — Live Leaderboard Server
+# Level 8 — Live Leaderboard Server
 
 This is a tiny backend that makes the arcade leaderboard **shared and live**
 across every player, instead of each browser keeping its own private copy
