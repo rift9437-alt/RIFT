@@ -179,7 +179,11 @@ const STAT_CEILINGS = {
   asteroid: { highScore: 5000 },
   breaker: { highScore: 5000 },
   roguelike: { deepestFloor: 500 },
-  comet: { highScore: 5000 }
+  comet: { highScore: 5000 },
+  tunnel: { highScore: 250000 },
+  depths: { bestWave: 200 },
+  stack: { bestHeight: 500 },
+  golf: { bestHoles: 200 }
 };
 const MAX_INCREMENT_PER_CALL = 5;
 
@@ -196,7 +200,13 @@ const REASON_QTY_CAPS = {
   roguelike_kill: 100,
   roguelike_floor: 100,
   roguelike_loot: 50,
-  comet_dodged: 200
+  comet_dodged: 200,
+  tunnel_gate: 300,
+  depths_kill: 60,
+  depths_wave: 1,
+  stack_block: 5,
+  golf_hole: 5,
+  sumo_win: 1, sumo_loss: 1
 };
 
 const DEFAULT_STATS = {
@@ -208,7 +218,12 @@ const DEFAULT_STATS = {
   asteroid: { highScore: 0 },
   breaker: { highScore: 0 },
   roguelike: { deepestFloor: 0 },
-  comet: { highScore: 0 }
+  comet: { highScore: 0 },
+  tunnel: { highScore: 0 },
+  depths: { bestWave: 0 },
+  stack: { bestHeight: 0 },
+  golf: { bestHoles: 0 },
+  sumo: { wins: 0 }
 };
 
 // ---------------------------------------------------------------------------
@@ -230,7 +245,13 @@ const REWARDS = {
   roguelike_kill: 2,     // per monster killed that run
   roguelike_floor: 10,   // per floor cleared that run
   roguelike_loot: 3,     // per loot pickup grabbed that run
-  comet_dodged: 0.5      // per comet dodged that run
+  comet_dodged: 0.5,     // per comet dodged that run
+  tunnel_gate: 1,        // per barrier ring threaded that run
+  depths_kill: 2,        // per hostile killed that run
+  depths_wave: 12,       // per wave cleared
+  stack_block: 2,        // per block landed on the tower
+  golf_hole: 15,         // per hole sunk
+  sumo_win: 20, sumo_loss: 5
 };
 
 const SHOP_ITEMS = {
@@ -352,6 +373,20 @@ const ROGUELIKE_UPGRADES = {
 // Override by setting ADMIN_PASSWORD in the environment before starting the server.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ADMIN_123';
 const DEFAULT_UPDATELOG = `=== LEVEL 7 UPDATE LOG ===
+
+[2026-07-30] ARCADE CHAT — there's now a live chat room docked in the corner of every screen. Everyone signed in shares it, messages arrive within a few seconds, and it remembers whether you had it open. Minimise it and a badge counts anything you missed.
+
+[2026-07-30] FIVE NEW CABINETS, THREE OF THEM IN 3D:
+  • HYPER TUNNEL (3D) — roll around a real perspective-projected tunnel, thread the gap in each barrier ring and burn boost for score. Energy cells refill your boost and stack a multiplier. 3 shields, three speed classes.
+  • NEON DEPTHS (3D) — a first-person raycast shooter. Each wave generates a fresh maze full of hunters; clear it to heal and reload. Drones rush you, sentinels hold back and shoot. Minimap in the corner, 12-round mag, R to reload.
+  • SKY STACK (3D) — stack a tower block by block with the camera climbing and orbiting as you go. Overhang gets sliced off; centre a drop for a PERFECT and win width back.
+  • GRAVITY GOLF — orbital mini-golf. Slingshot around planets, dodge repulsors and burning stars, sink the wormhole. Beat par and you bank the spare shots.
+  • NEON SUMO — 1v1 shoving match on a shrinking disc. Dash costs stamina, power pads make your hit heavier, first to 3 ring-outs wins. Bot with 3 difficulties or local multiplayer.
+
+[2026-07-30] DASHBOARD — cabinets now carry SOLO / 1v1 / 3D / NEW tags, filter chips to narrow the grid, a "Surprise Me" roll, and your personal best printed on each card.
+[2026-07-30] LEADERBOARD — added the missing Crypt Crawler board plus boards for all five new cabinets, and a new ARCADE CHAMPION table that scores 3/2/1 points for every cabinet's top three.
+[2026-07-30] SOUND — the whole arcade now has procedural sound effects (no audio files, all synthesised). Mute from the topbar, or open the new ⚙ Settings panel to toggle sound, CRT scanlines and screen shake.
+[2026-07-30] FIXED — pausing (ESC / ⏸) never worked in Crypt Crawler; it does now. Typing in a text field no longer leaks keypresses into a running game.
 
 [2026-07-31] SHOP — added Zip, the most expensive theme yet (3000 tokens). Equip it and a trash-talking commentary box shows up after every match or run, reacting to how you did. Purely cosmetic — no gameplay effect.
 
@@ -559,6 +594,15 @@ async function initDb() {
   if (bRows.rows.length === 0) {
     await pool.query('INSERT INTO broadcast (id, content) VALUES (1, $1)', ['']);
   }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat (
+      id BIGSERIAL PRIMARY KEY,
+      username TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS chat_id_idx ON chat (id DESC)');
 }
 
 async function logAdminAction(action, details){
@@ -739,6 +783,112 @@ app.post('/api/updatelog/update', async (req, res) => {
     res.json({ content: updated });
   } catch (e) {
     console.error('Update log save failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Arcade chat
+// ---------------------------------------------------------------------------
+// One shared room for all keyholders. Messages live in their own table rather
+// than in the player records, so posting a message never touches (or locks)
+// leaderboard data. The client polls with `since` so a busy room doesn't mean
+// re-downloading the whole history every few seconds.
+const CHAT_MAX_LEN = 300;
+const CHAT_BACKLOG = 120;     // how much history a fresh client gets
+const CHAT_KEEP_ROWS = 600;   // older messages are trimmed away
+const CHAT_MIN_GAP_MS = 800;  // fastest one account may post
+const CHAT_BURST_LIMIT = 12;  // messages per 30s window, per account
+const chatActivity = new Map(); // username -> { last, stamps: [] }
+
+function chatSpamCheck(username){
+  const now = Date.now();
+  const rec = chatActivity.get(username) || { last: 0, stamps: [] };
+  if (now - rec.last < CHAT_MIN_GAP_MS) {
+    return 'You are sending messages too fast.';
+  }
+  rec.stamps = rec.stamps.filter(t => now - t < 30 * 1000);
+  if (rec.stamps.length >= CHAT_BURST_LIMIT) {
+    return 'Too many messages — give the room a moment.';
+  }
+  rec.last = now;
+  rec.stamps.push(now);
+  chatActivity.set(username, rec);
+  return null;
+}
+
+function chatRowToMessage(row) {
+  return { id: Number(row.id), user: row.username, text: row.body, at: row.created_at };
+}
+
+async function loadChatSince(since) {
+  if (since > 0) {
+    const { rows } = await pool.query(
+      'SELECT id, username, body, created_at FROM chat WHERE id > $1 ORDER BY id ASC LIMIT 200',
+      [since]
+    );
+    return rows.map(chatRowToMessage);
+  }
+  const { rows } = await pool.query(
+    'SELECT id, username, body, created_at FROM chat ORDER BY id DESC LIMIT $1',
+    [CHAT_BACKLOG]
+  );
+  return rows.reverse().map(chatRowToMessage);
+}
+
+app.get('/api/chat', async (req, res) => {
+  const user = authenticate(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+  }
+  const since = Math.max(0, parseInt(req.query.since, 10) || 0);
+  try {
+    res.json({ messages: await loadChatSince(since) });
+  } catch (e) {
+    console.error('Chat load failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/chat', async (req, res) => {
+  const { user, text, since } = req.body || {};
+  if (!USERS.includes(user)) {
+    return res.status(400).json({ error: 'Unknown user' });
+  }
+  if (!requireOwnUser(req, res, user)) return;
+  if (typeof text !== 'string') {
+    return res.status(400).json({ error: 'text must be a string' });
+  }
+  // Collapse runs of blank lines so nobody can shove the room off-screen.
+  const clean = text.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, CHAT_MAX_LEN);
+  if (!clean) {
+    return res.status(400).json({ error: 'Message is empty.' });
+  }
+  const spam = chatSpamCheck(user);
+  if (spam) {
+    return res.status(429).json({ error: spam });
+  }
+  flagIfSuspicious(user, 'chat/post');
+
+  try {
+    const inserted = await pool.query(
+      'INSERT INTO chat (username, body) VALUES ($1, $2) RETURNING id, username, body, created_at',
+      [user, clean]
+    );
+    // Opportunistic trim — cheap, and keeps the table from growing forever.
+    if (Number(inserted.rows[0].id) % 25 === 0) {
+      await pool.query(
+        'DELETE FROM chat WHERE id <= (SELECT id FROM chat ORDER BY id DESC OFFSET $1 LIMIT 1)',
+        [CHAT_KEEP_ROWS]
+      ).catch(() => {});
+    }
+    const from = Math.max(0, parseInt(since, 10) || 0);
+    const messages = from > 0
+      ? await loadChatSince(from)
+      : [chatRowToMessage(inserted.rows[0])];
+    res.json({ messages });
+  } catch (e) {
+    console.error('Chat post failed:', e);
     res.status(500).json({ error: 'Internal error' });
   }
 });
@@ -1195,6 +1345,23 @@ app.post('/api/admin/broadcast', async (req, res) => {
     res.json(await loadBroadcast());
   } catch (e) {
     console.error('Admin broadcast failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Admin-only: wipe the shared chat room.
+app.post('/api/admin/clear-chat', async (req, res) => {
+  const { password } = req.body || {};
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Incorrect admin password' });
+  }
+  try {
+    const { rowCount } = await pool.query('DELETE FROM chat');
+    chatActivity.clear();
+    logAdminAction('clear_chat', { removed: rowCount });
+    res.json({ ok: true, removed: rowCount });
+  } catch (e) {
+    console.error('Admin clear chat failed:', e);
     res.status(500).json({ error: 'Internal error' });
   }
 });
