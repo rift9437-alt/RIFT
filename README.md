@@ -168,12 +168,51 @@ the history every few seconds.
   remembered per device.
 - To wipe the room, use **Clear Arcade Chat** in the admin panel.
 
+## Beyond the games
+
+The arcade has a progression layer that sits across every cabinet.
+
+**Perks** (Shop → Perks) are bought with coins and apply account-wide, not to
+one game. Coin Magnet, Second Wind (revive), Extra Guard (+1 life/shield),
+Insurance, Lucky Streak and Streak Saver. Anything that touches a payout is
+applied **server-side** in `/api/wallet/earn` and `/api/run/complete`, so a
+client claiming a perk level it doesn't own gets nothing extra.
+
+**Daily bonus** pays once a day and scales with your streak (capped at 7
+days). **Daily challenges** are three rotating objectives, picked
+deterministically from the date so everyone gets the same set without the
+server storing a generated list.
+
+**Achievements** — 24 of them. Each is a pure function of a player's stored
+record, so progress is recomputed rather than tracked separately, which means
+they backfill correctly for anything earned before the feature shipped.
+
+**Titles and emblems** are cosmetic shop tabs; both render next to your name
+in chat and on every leaderboard.
+
+**Prize wheel** costs 120 coins a spin. The winning slice is chosen by
+`spinWheel()` on the server — the client animation just spins to the index it
+was handed, so the visual can't decide the outcome.
+
+**Who's online and the live ticker** come from two in-memory stores
+(`presence`, `activity`) rather than the database, since both are live state
+with no reason to survive a restart. Presence entries expire after 45s.
+
+### Effects layer
+
+`FX` is one shared module every cabinet draws through: a particle pool,
+shockwave rings, floating text, screen shake and hit-stop, keyed per canvas so
+nothing leaks between games. A game calls `FX.burst()` / `FX.shake()` /
+`FX.text()` at the moment of impact and `FX.draw()` once per frame — which is
+wired into all 14 render loops.
+
 ## Sound & settings
 
 Every sound in the arcade is synthesised at runtime with WebAudio — there are
 no audio files to host. Mute from the 🔊 button in the top bar, or open the
-⚙ **Settings** panel for sound, CRT scanlines and screen shake. Those three
-preferences are stored per device in `localStorage`, not on the server.
+⚙ **Settings** panel for sound, CRT scanlines, screen shake, screen
+transitions and the animated background. Those preferences are stored per
+device in `localStorage`, not on the server.
 
 ## Wild Duel
 

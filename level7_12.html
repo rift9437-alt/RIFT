@@ -891,6 +891,381 @@
     min-height:16px;
     letter-spacing:0.5px;
   }
+  /* ---------- animated background ---------- */
+  #bg-canvas{
+    position:fixed;
+    inset:0;
+    z-index:-1;
+    pointer-events:none;
+    opacity:0.55;
+  }
+  body.no-bg #bg-canvas{display:none;}
+
+  /* ---------- screen transition wipe ---------- */
+  #screen-wipe{
+    position:fixed;
+    inset:0;
+    z-index:9500;
+    pointer-events:none;
+    background:linear-gradient(180deg, transparent 0%, rgba(45,226,197,0.06) 45%, rgba(255,255,255,0.85) 50%, rgba(255,61,138,0.06) 55%, transparent 100%);
+    opacity:0;
+  }
+  #screen-wipe.run{animation:wipe .42s ease-out;}
+  @keyframes wipe{
+    0%{opacity:0; transform:scaleY(0.02) translateY(-45vh);}
+    18%{opacity:1;}
+    100%{opacity:0; transform:scaleY(1.4) translateY(45vh);}
+  }
+
+  /* ---------- toasts ---------- */
+  #toast-stack{
+    position:fixed;
+    top:74px;
+    right:20px;
+    z-index:9600;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    pointer-events:none;
+    max-width:320px;
+  }
+  .toast{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-left:3px solid var(--cyan);
+    border-radius:10px;
+    padding:12px 16px;
+    box-shadow:0 12px 34px rgba(0,0,0,0.55);
+    animation:toast-in .28s cubic-bezier(.2,.9,.3,1.4);
+  }
+  .toast.leaving{animation:toast-out .3s ease-in forwards;}
+  .toast-gold{border-left-color:var(--gold);}
+  .toast-pink{border-left-color:var(--pink);}
+  @keyframes toast-in{from{opacity:0; transform:translateX(40px) scale(.9);} to{opacity:1; transform:none;}}
+  @keyframes toast-out{to{opacity:0; transform:translateX(40px) scale(.95);}}
+  .toast-icon{font-size:22px; line-height:1;}
+  .toast-title{
+    font-family:var(--font-mono);
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--text);
+  }
+  .toast-sub{
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--text-dim);
+    margin-top:2px;
+  }
+
+  /* ---------- tabs ---------- */
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+  }
+  .tab{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    padding:10px 16px;
+    border-radius:7px;
+    cursor:pointer;
+    transition:all .15s;
+  }
+  .tab:hover{color:var(--text);}
+  .tab.active{
+    border-color:var(--cyan);
+    color:var(--cyan);
+    background:rgba(45,226,197,0.1);
+    box-shadow:0 0 12px rgba(45,226,197,0.2);
+  }
+
+  /* ---------- perks ---------- */
+  .perk-card{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .perk-head{display:flex; align-items:center; gap:10px;}
+  .perk-icon{font-size:24px; line-height:1;}
+  .perk-name{font-weight:700; font-size:14px;}
+  .perk-desc{font-family:var(--font-mono); font-size:11px; color:var(--text-dim); line-height:1.6; min-height:34px;}
+  .perk-pips{display:flex; gap:5px;}
+  .perk-pip{
+    flex:1;
+    height:6px;
+    border-radius:3px;
+    background:var(--border);
+  }
+  .perk-pip.on{background:var(--gold); box-shadow:0 0 8px rgba(255,200,87,0.5);}
+  .perk-card .btn{width:100%; margin-top:4px; font-size:11px; padding:9px 10px;}
+
+  /* ---------- achievements ---------- */
+  .ach-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(240px,1fr));
+    gap:14px;
+    width:100%;
+  }
+  .ach-card{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px;
+    display:flex;
+    gap:12px;
+    align-items:flex-start;
+    opacity:0.55;
+    transition:opacity .15s, border-color .15s;
+  }
+  .ach-card.earned{
+    opacity:1;
+    border-color:rgba(255,200,87,0.5);
+    background:linear-gradient(135deg, rgba(255,200,87,0.08), transparent);
+  }
+  .ach-icon{font-size:26px; line-height:1;}
+  .ach-name{font-weight:700; font-size:13px; margin-bottom:2px;}
+  .ach-desc{font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); line-height:1.5;}
+  .ach-bar{
+    margin-top:7px;
+    height:5px;
+    border-radius:3px;
+    background:rgba(0,0,0,0.5);
+    overflow:hidden;
+  }
+  .ach-bar > i{display:block; height:100%; background:var(--cyan);}
+  .ach-card.earned .ach-bar > i{background:var(--gold);}
+  .ach-reward{font-family:var(--font-mono); font-size:10px; color:var(--gold); margin-top:5px;}
+
+  /* ---------- daily panel ---------- */
+  .daily-panel{
+    background:linear-gradient(135deg, rgba(255,200,87,0.09), rgba(45,226,197,0.05));
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:18px 20px;
+    margin-bottom:22px;
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .daily-left{flex:1; min-width:210px;}
+  .daily-title{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:6px;
+  }
+  .daily-streak{font-family:var(--font-mono); font-size:12px; color:var(--text-dim);}
+  .daily-panel .btn{margin-top:0; width:auto; padding:11px 20px;}
+  .challenge-list{flex:2; min-width:260px; display:flex; flex-direction:column; gap:9px;}
+  .challenge-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--text-dim);
+  }
+  .challenge-row b{color:var(--text);}
+  .challenge-bar{
+    flex:1;
+    height:6px;
+    border-radius:3px;
+    background:rgba(0,0,0,0.45);
+    overflow:hidden;
+    min-width:60px;
+  }
+  .challenge-bar > i{display:block; height:100%; background:var(--cyan); transition:width .3s;}
+  .challenge-row.done .challenge-bar > i{background:var(--gold);}
+  .challenge-claim{
+    background:transparent;
+    border:1px solid var(--gold);
+    color:var(--gold);
+    font-family:var(--font-mono);
+    font-size:9.5px;
+    letter-spacing:1px;
+    padding:4px 9px;
+    border-radius:4px;
+    cursor:pointer;
+    text-transform:uppercase;
+  }
+  .challenge-claim:disabled{opacity:0.3; cursor:default;}
+
+  /* ---------- profile ---------- */
+  .profile-wrap{width:100%; max-width:960px;}
+  .profile-hero{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:26px 28px;
+    display:flex;
+    gap:22px;
+    align-items:center;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .profile-emblem{
+    font-size:44px;
+    width:78px; height:78px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:16px;
+    background:var(--bg-panel-raised);
+    border:1px solid var(--border);
+  }
+  .profile-name{font-family:var(--font-display); font-size:19px; letter-spacing:1.5px;}
+  .profile-title{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:2px;
+    color:var(--gold);
+    margin-top:7px;
+    text-transform:uppercase;
+    min-height:14px;
+  }
+  .stat-row{display:flex; gap:12px; flex-wrap:wrap; margin-left:auto;}
+  .stat-tile{
+    background:var(--bg-panel-raised);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 18px;
+    text-align:center;
+    min-width:92px;
+  }
+  .stat-tile b{display:block; font-family:var(--font-mono); font-size:20px; color:var(--cyan);}
+  .stat-tile span{font-family:var(--font-mono); font-size:9.5px; letter-spacing:1px; color:var(--text-dim); text-transform:uppercase;}
+  .history-row{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    padding:9px 4px;
+    border-bottom:1px solid rgba(38,44,58,0.6);
+    color:var(--text-dim);
+  }
+  .history-row:last-child{border-bottom:none;}
+  .history-badge{
+    font-size:9px;
+    letter-spacing:1px;
+    padding:3px 7px;
+    border-radius:4px;
+    text-transform:uppercase;
+    border:1px solid var(--border);
+  }
+  .history-win{color:var(--gold); border-color:rgba(255,200,87,0.5);}
+  .history-loss{color:var(--pink); border-color:rgba(255,61,138,0.4);}
+
+  /* ---------- prize wheel ---------- */
+  .wheel-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+    width:100%;
+    max-width:640px;
+  }
+  .wheel-result{
+    font-family:var(--font-display);
+    font-size:15px;
+    letter-spacing:1.5px;
+    min-height:22px;
+    color:var(--gold);
+    text-align:center;
+  }
+
+  /* ---------- presence + activity ticker ---------- */
+  .presence-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    padding:6px 0;
+    color:var(--text-dim);
+  }
+  .dot-online{
+    width:7px; height:7px;
+    border-radius:50%;
+    background:#45ffb0;
+    box-shadow:0 0 8px rgba(69,255,176,0.8);
+    flex-shrink:0;
+  }
+  .presence-item b{color:var(--cyan);}
+  #ticker{
+    width:100%;
+    max-width:1080px;
+    margin:0 auto 18px;
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:9px;
+    padding:9px 14px;
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--text-dim);
+    overflow:hidden;
+    white-space:nowrap;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  #ticker .ticker-label{
+    color:var(--pink);
+    letter-spacing:1.5px;
+    flex-shrink:0;
+  }
+  #ticker .ticker-body{
+    flex:1;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  /* ---------- name decorations (chat + leaderboard) ---------- */
+  .name-emblem{margin-right:4px;}
+  .name-title{
+    font-size:8.5px;
+    letter-spacing:1px;
+    color:var(--gold);
+    border:1px solid rgba(255,200,87,0.4);
+    border-radius:3px;
+    padding:1px 4px;
+    margin-left:5px;
+    text-transform:uppercase;
+  }
+
+  /* ---------- game frame / bezel ---------- */
+  .canvas-wrap canvas, .play-area canvas{
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.05),
+      0 0 34px rgba(0,0,0,0.7),
+      0 0 60px color-mix(in srgb, var(--cyan) 12%, transparent);
+  }
+  .play-area{position:relative;}
+  .mode-note{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:1px;
+    color:var(--text-dim);
+    margin-top:8px;
+    text-transform:uppercase;
+  }
+
   /* ---------- arcade chat dock ---------- */
   #chat-dock{
     position:fixed;
@@ -1100,6 +1475,9 @@
 </style>
 </head>
 <body>
+<canvas id="bg-canvas"></canvas>
+<div id="screen-wipe"></div>
+<div id="toast-stack"></div>
 <div class="scanlines"></div>
 <div id="lockdown-banner" class="lockdown-banner hidden">⚠ EMERGENCY LOCKDOWN — the site is temporarily read-only ⚠</div>
 <div id="broadcast-banner" class="broadcast-banner hidden">
@@ -1133,13 +1511,31 @@
       <span class="token-badge" id="token-balance">🪙 0</span>
       <button class="icon-btn" id="sound-toggle-btn" onclick="toggleSound()" title="Toggle sound">🔊</button>
       <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
-      <button class="shop-btn" onclick="stopAllGames(); showScreen('shop-screen'); renderShop();">Shop</button>
+      <button class="icon-btn" onclick="openProfile()" title="Your profile">👤</button>
+      <button class="icon-btn" onclick="openAchievements()" title="Achievements">🎖</button>
+      <button class="icon-btn" onclick="openWheel()" title="Prize wheel">🎡</button>
+      <button class="shop-btn" onclick="openShop()">Shop</button>
       <span class="user-badge">SIGNED IN AS <b id="current-username">-</b></span>
       <button class="btn btn-secondary" onclick="logout()">Log Out</button>
     </div>
   </div>
   <div class="dash-content">
     <div class="dash-welcome" id="dash-welcome-line">WELCOME BACK</div>
+
+    <div id="ticker">
+      <span class="ticker-label">◉ LIVE</span>
+      <span class="ticker-body" id="ticker-body">Nothing happening yet — be the first.</span>
+    </div>
+
+    <div class="daily-panel">
+      <div class="daily-left">
+        <div class="daily-title">Daily Bonus</div>
+        <div class="daily-streak" id="daily-streak">—</div>
+        <button class="btn btn-primary" id="daily-claim-btn" style="margin-top:10px;" onclick="claimDaily()">Claim</button>
+      </div>
+      <div class="challenge-list" id="challenge-list"></div>
+    </div>
+
     <div class="dash-title">SELECT A CABINET</div>
     <div class="dash-toolbar" id="dash-toolbar">
       <button class="filter-chip active" data-filter="all" onclick="setCabinetFilter('all')">All</button>
@@ -1788,9 +2184,73 @@
       <span>Your Balance</span>
       <span class="shop-balance" id="shop-balance">🪙 0</span>
     </div>
+    <div class="tabs" id="shop-tabs">
+      <button class="tab active" data-tab="themes" onclick="setShopTab('themes')">Themes</button>
+      <button class="tab" data-tab="perks" onclick="setShopTab('perks')">Perks</button>
+      <button class="tab" data-tab="titles" onclick="setShopTab('titles')">Titles</button>
+      <button class="tab" data-tab="emblems" onclick="setShopTab('emblems')">Emblems</button>
+    </div>
     <div class="shop-message" id="shop-message"></div>
     <div class="shop-grid" id="shop-grid"></div>
-    <div class="shop-note">Tokens are earned by playing — wins pay more than losses, and Soccer goals/saves and your Runner/Asteroid scores chip in too. Unlocked themes swap the neon color scheme across the whole arcade.</div>
+    <div class="shop-note" id="shop-note">Tokens are earned by playing — wins pay more than losses, and Soccer goals/saves and your Runner/Asteroid scores chip in too. Unlocked themes swap the neon color scheme across the whole arcade.</div>
+  </div>
+</div>
+
+<!-- ============ PROFILE SCREEN ============ -->
+<div id="profile-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:960px;">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">👤 PROFILE</div>
+  </div>
+  <div class="profile-wrap">
+    <div class="profile-hero">
+      <div class="profile-emblem" id="profile-emblem">🎮</div>
+      <div>
+        <div class="profile-name" id="profile-name">—</div>
+        <div class="profile-title" id="profile-title"></div>
+      </div>
+      <div class="stat-row" id="profile-stats"></div>
+    </div>
+    <div class="lb-grid" style="max-width:none;">
+      <div class="lb-card">
+        <h3>📈 Cabinet Bests</h3>
+        <table id="profile-bests"></table>
+      </div>
+      <div class="lb-card">
+        <h3>🕘 Recent Runs</h3>
+        <div id="profile-history"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ACHIEVEMENTS SCREEN ============ -->
+<div id="achievements-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:1000px;">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🎖 ACHIEVEMENTS</div>
+    <span class="hud-chip" id="ach-count" style="margin-left:auto;">0 / 0</span>
+  </div>
+  <div style="width:100%; max-width:1000px;">
+    <div class="ach-grid" id="ach-grid"></div>
+  </div>
+</div>
+
+<!-- ============ PRIZE WHEEL SCREEN ============ -->
+<div id="wheel-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:640px;">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🎡 PRIZE WHEEL</div>
+  </div>
+  <div class="wheel-wrap">
+    <div class="shop-balance-row" style="width:100%;">
+      <span>Your Balance</span>
+      <span class="shop-balance" id="wheel-balance">🪙 0</span>
+    </div>
+    <canvas id="wheel-canvas" width="380" height="380"></canvas>
+    <div class="wheel-result" id="wheel-result"></div>
+    <button class="btn btn-primary" id="wheel-spin-btn" style="max-width:260px;" onclick="spinPrizeWheel()">Spin &middot; 🪙 120</button>
+    <div class="shop-note">The wheel is spun on the server, so the result is out of everyone's hands — including yours. Most slices pay less than the ticket; the jackpot pays a lot more.</div>
   </div>
 </div>
 
@@ -1973,10 +2433,12 @@
       <span class="chat-title">Arcade Chat</span>
       <div class="chat-head-actions">
         <span id="chat-status" style="font-size:9px; letter-spacing:1px; color:var(--text-dim);">LIVE</span>
+        <button class="chat-mini-btn" id="chat-who-btn" onclick="toggleWhosOnline()" title="Who's online">👥<span id="chat-online-count">0</span></button>
         <button class="chat-mini-btn" onclick="refreshChat(true)" title="Refresh">⟳</button>
         <button class="chat-mini-btn" onclick="toggleChatDock()" title="Minimise">–</button>
       </div>
     </div>
+    <div id="chat-presence" class="hidden" style="border-bottom:1px solid var(--border); padding:8px 12px; background:var(--bg);"></div>
     <div class="chat-log" id="chat-log">
       <div class="chat-note">Loading the room…</div>
     </div>
@@ -2004,6 +2466,14 @@
     <div class="settings-row">
       <span>SCREEN SHAKE</span>
       <div class="toggle" id="setting-shake" onclick="toggleSetting('shake')"></div>
+    </div>
+    <div class="settings-row">
+      <span>SCREEN TRANSITIONS</span>
+      <div class="toggle" id="setting-transitions" onclick="toggleSetting('transitions')"></div>
+    </div>
+    <div class="settings-row">
+      <span>ANIMATED BACKGROUND</span>
+      <div class="toggle" id="setting-bg" onclick="toggleSetting('bg')"></div>
     </div>
     <button class="btn btn-primary" onclick="closeSettings()">Done</button>
   </div>
@@ -2115,13 +2585,38 @@ function afterLogin(){
   refreshCabinets();
   openChatDock();
   startChatPolling();
+  loadPerkCatalog();
+  loadCosmetics();
+  loadDaily();
+  pingPresence();
+  pollActivity();
+  startPresencePolling();
+  toast('Welcome back', currentUser, '👋');
+}
+
+function startPresencePolling(){
+  stopPresencePolling();
+  presenceTimer = setInterval(()=>{
+    if(!currentUser) return;
+    pingPresence();
+    pollActivity();
+  }, 20000);
+  // Rotate the ticker independently of the fetch, so it reads as live.
+  setInterval(cycleTicker, 7000);
+}
+
+function stopPresencePolling(){
+  if(presenceTimer){ clearInterval(presenceTimer); presenceTimer = null; }
 }
 
 function logout(){
   stopAllGames();
   stopGlobalPolling();
   stopChatPolling();
+  stopPresencePolling();
   hideChatDock();
+  onlineList = [];
+  dailyState = null;
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_TOKEN_KEY);
   currentUser = null;
@@ -2198,18 +2693,26 @@ function stopGlobalPolling(){
    ========================================================= */
 let currentScreen = 'login-screen';
 function showScreen(id){
+  const changed = id !== currentScreen;
   document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
   currentScreen = id;
   window.scrollTo(0,0);
+  if(changed && currentUser){
+    playWipe();
+    pingPresence();
+  }
 }
 function backToDashboard(){
   stopAllGames();
   document.getElementById('pause-overlay').classList.add('hidden');
   showScreen('dashboard-screen');
   refreshCabinets();
+  loadDaily();
 }
 function stopAllGames(){
+  resetRevives();
+  ['soccer','racing','tank','runner','asteroid','breaker','wildduel','roguelike','comet','tunnel','depths','stack','golf','sumo'].forEach(k=>FX.reset(k));
   SoccerGame.stop();
   RacingGame.stop();
   TankGame.stop();
@@ -2267,6 +2770,7 @@ async function loadLeaderboard(){
       if(!data[u]) data[u] = freshUserRecord();
     });
     lbCache = data;
+    refreshDecorations(data);
     return data;
   }catch(e){
     console.error('Leaderboard fetch failed, showing last known data:', e);
@@ -2357,6 +2861,461 @@ async function loadWallet(){
 }
 
 /* =========================================================
+   PERKS — account-wide, coin-bought, applied in every cabinet
+   =========================================================
+   The server owns the prices and re-derives anything that touches the wallet;
+   these helpers only read the levels back so gameplay can use the numbers. */
+let perkCatalog = null;
+
+function perkLevel(id){
+  return (wallet && wallet.perks && wallet.perks[id]) || 0;
+}
+
+// Multipliers the games ask for by name.
+const Perks = {
+  revives(){ return perkLevel('secondWind'); },
+  extraGuard(){ return perkLevel('extraGuard'); }
+};
+
+async function loadPerkCatalog(){
+  if(perkCatalog) return;
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/perks`);
+    perkCatalog = res.ok ? await res.json() : {};
+  }catch(e){ perkCatalog = {}; }
+}
+
+let cosmeticCatalog = null;
+async function loadCosmetics(){
+  if(cosmeticCatalog) return;
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/cosmetics`);
+    cosmeticCatalog = res.ok ? await res.json() : { titles:{}, emblems:{} };
+  }catch(e){ cosmeticCatalog = { titles:{}, emblems:{} }; }
+}
+
+// Name decorations shown next to a player in chat and on the leaderboard.
+let decorCache = {};
+function decorate(user){
+  const d = decorCache[user];
+  if(!d) return escapeHtml(user);
+  return (d.emblem ? `<span class="name-emblem">${d.emblem}</span>` : '') +
+         escapeHtml(user) +
+         (d.title ? `<span class="name-title">${escapeHtml(d.title)}</span>` : '');
+}
+
+// Rebuilt whenever the leaderboard is fetched — it already carries wallets.
+function refreshDecorations(data){
+  if(!data || !cosmeticCatalog) return;
+  USERS.forEach(u=>{
+    const w = (data[u] && data[u].wallet) || {};
+    const t = cosmeticCatalog.titles[w.title || 'none'];
+    const e = cosmeticCatalog.emblems[w.emblem || 'none'];
+    decorCache[u] = { title: (t && t.text) || '', emblem: (e && e.icon) || '' };
+  });
+}
+
+/* =========================================================
+   RUN COMPLETION — one call at the end of every run or match
+   ========================================================= */
+async function runComplete(game, result, summary){
+  if(!currentUser) return;
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/run/complete`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser, game, result, summary })
+    });
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data.wallet){ wallet = data.wallet; updateTokenDisplay(); }
+    if(data.bonus){
+      toast('Lucky Streak!', '+' + data.bonus + ' bonus tokens', '🍀', 'gold');
+      Sfx.play('coin');
+    }
+    announceAchievements(data.achievements);
+    renderChallenges(data.challenges);
+  }catch(e){ /* a failed report should never break the result screen */ }
+}
+
+/* =========================================================
+   DAILY BONUS + CHALLENGES
+   ========================================================= */
+let dailyState = null;
+
+async function loadDaily(){
+  if(!currentUser) return;
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/daily?user=${encodeURIComponent(currentUser)}`);
+    if(!res.ok) return;
+    dailyState = await res.json();
+    renderDaily();
+  }catch(e){}
+}
+
+function renderDaily(){
+  if(!dailyState) return;
+  const btn = document.getElementById('daily-claim-btn');
+  const streakEl = document.getElementById('daily-streak');
+  if(streakEl){
+    streakEl.textContent = dailyState.canClaim
+      ? `🔥 ${dailyState.streak} day streak · claim ${dailyState.nextReward} tokens`
+      : `🔥 ${dailyState.streak} day streak · come back tomorrow`;
+  }
+  if(btn){
+    btn.disabled = !dailyState.canClaim;
+    btn.textContent = dailyState.canClaim ? `Claim 🪙 ${dailyState.nextReward}` : 'Claimed Today';
+  }
+  renderChallenges(dailyState.challenges);
+}
+
+function renderChallenges(list){
+  if(!Array.isArray(list)) return;
+  if(dailyState) dailyState.challenges = list;
+  const box = document.getElementById('challenge-list');
+  if(!box) return;
+  box.innerHTML = list.map(c=>`
+    <div class="challenge-row ${c.done?'done':''}">
+      <span style="min-width:150px;">${escapeHtml(c.desc)}</span>
+      <div class="challenge-bar"><i style="width:${Math.round((c.value/c.goal)*100)}%"></i></div>
+      <b>${c.value}/${c.goal}</b>
+      <button class="challenge-claim" ${c.done && !c.claimed ? '' : 'disabled'} onclick="claimChallenge('${c.id}')">
+        ${c.claimed ? 'Claimed' : '🪙 ' + c.reward}
+      </button>
+    </div>
+  `).join('');
+}
+
+async function claimDaily(){
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/daily/claim`, {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast('Already claimed', data.error || '', '⏳'); return; }
+    wallet = data.wallet;
+    updateTokenDisplay();
+    toast('Daily bonus', '+' + data.reward + ' tokens · ' + data.streak + ' day streak', '🎁', 'gold');
+    Sfx.play('win');
+    announceAchievements(data.achievements);
+    loadDaily();
+  }catch(e){ toast('Could not reach the server', '', '⚠️', 'pink'); }
+}
+
+async function claimChallenge(id){
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/daily/challenge/claim`, {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser, id })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast('Not yet', data.error || '', '⏳'); return; }
+    wallet = data.wallet;
+    updateTokenDisplay();
+    toast('Challenge complete', '+' + data.reward + ' tokens', '✅', 'gold');
+    Sfx.play('coin');
+    announceAchievements(data.achievements);
+    renderChallenges(data.challenges);
+  }catch(e){ toast('Could not reach the server', '', '⚠️', 'pink'); }
+}
+
+/* =========================================================
+   ACHIEVEMENTS SCREEN
+   ========================================================= */
+async function openAchievements(){
+  stopAllGames();
+  showScreen('achievements-screen');
+  const grid = document.getElementById('ach-grid');
+  grid.innerHTML = '<div class="chat-note">Loading…</div>';
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/achievements?user=${encodeURIComponent(currentUser)}`);
+    const data = await res.json();
+    const list = data.achievements || [];
+    document.getElementById('ach-count').textContent = list.filter(a=>a.earned).length + ' / ' + list.length;
+    grid.innerHTML = list.map(a=>`
+      <div class="ach-card ${a.earned?'earned':''}">
+        <div class="ach-icon">${a.earned ? a.icon : '🔒'}</div>
+        <div style="flex:1;">
+          <div class="ach-name">${escapeHtml(a.name)}</div>
+          <div class="ach-desc">${escapeHtml(a.desc)}</div>
+          <div class="ach-bar"><i style="width:${Math.round((a.value/a.goal)*100)}%"></i></div>
+          <div class="ach-reward">${a.earned ? 'EARNED · ' : ''}🪙 ${a.reward}${a.earned ? '' : ' · ' + a.value + '/' + a.goal}</div>
+        </div>
+      </div>
+    `).join('');
+  }catch(e){
+    grid.innerHTML = '<div class="chat-note">Could not load achievements.</div>';
+  }
+}
+
+/* =========================================================
+   PROFILE SCREEN
+   ========================================================= */
+const GAME_LABELS = {
+  soccer:'⚽ Street Soccer', racing:'🏎️ Apex Loop', tank:'🛡️ Tank Duel', runner:'🏃 Hop Runner',
+  wildduel:'🤠 Wild Duel', asteroid:'🌠 Asteroid Blaster', breaker:'🧱 Neon Breaker',
+  roguelike:'⚔️ Crypt Crawler', comet:'☄️ Comet Dodge', tunnel:'🌀 Hyper Tunnel',
+  depths:'👁 Neon Depths', stack:'🏗 Sky Stack', golf:'🪐 Gravity Golf', sumo:'🥏 Neon Sumo'
+};
+
+async function openProfile(){
+  stopAllGames();
+  showScreen('profile-screen');
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/profile?user=${encodeURIComponent(currentUser)}`);
+    const p = await res.json();
+    document.getElementById('profile-name').textContent = p.user;
+    document.getElementById('profile-title').textContent = p.title || 'no title equipped';
+    document.getElementById('profile-emblem').textContent = p.emblem || '🎮';
+    document.getElementById('profile-stats').innerHTML = `
+      <div class="stat-tile"><b>${p.wallet.tokens}</b><span>Tokens</span></div>
+      <div class="stat-tile"><b>${p.versusWins}</b><span>Versus Wins</span></div>
+      <div class="stat-tile"><b>${p.achievementsEarned}/${p.achievementsTotal}</b><span>Achievements</span></div>
+      <div class="stat-tile"><b>${p.cabinetsPlayed}/14</b><span>Cabinets</span></div>
+      <div class="stat-tile"><b>${(p.streak && p.streak.count) || 0}</b><span>Day Streak</span></div>`;
+
+    document.getElementById('profile-bests').innerHTML =
+      '<tr><th>Cabinet</th><th>Best</th></tr>' +
+      Object.entries(p.stats).map(([game, rec])=>{
+        const parts = Object.entries(rec).map(([k,v])=>`${v}`).join(' / ');
+        return `<tr><td>${GAME_LABELS[game] || game}</td><td>${parts}</td></tr>`;
+      }).join('');
+
+    const hist = p.history || [];
+    document.getElementById('profile-history').innerHTML = hist.length
+      ? hist.map(h=>`
+          <div class="history-row">
+            <span class="history-badge ${h.result==='win'?'history-win':(h.result==='loss'?'history-loss':'')}">${h.result}</span>
+            <span style="flex:1;">${escapeHtml(h.summary || GAME_LABELS[h.game] || h.game)}</span>
+          </div>`).join('')
+      : '<div class="chat-note">No runs recorded yet.</div>';
+  }catch(e){
+    document.getElementById('profile-name').textContent = 'Could not load profile';
+  }
+}
+
+/* =========================================================
+   PRIZE WHEEL
+   ========================================================= */
+let wheelSlices = null;
+let wheelCost = 120;
+let wheelAngle = 0;
+let wheelSpinning = false;
+
+async function openWheel(){
+  stopAllGames();
+  showScreen('wheel-screen');
+  document.getElementById('wheel-result').textContent = '';
+  if(!wheelSlices){
+    try{
+      const res = await apiFetch(`${LB_API_BASE}/wheel`);
+      const data = await res.json();
+      wheelSlices = data.slices;
+      wheelCost = data.cost;
+    }catch(e){ wheelSlices = []; }
+  }
+  document.getElementById('wheel-spin-btn').textContent = `Spin · 🪙 ${wheelCost}`;
+  await loadWallet();
+  document.getElementById('wheel-balance').textContent = '🪙 ' + (wallet.tokens||0);
+  drawWheel();
+}
+
+function drawWheel(){
+  const canvas = document.getElementById('wheel-canvas');
+  if(!canvas || !wheelSlices || !wheelSlices.length) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2, R = Math.min(W,H)/2 - 16;
+  const n = wheelSlices.length;
+  const arc = Math.PI*2 / n;
+  const palette = ['#2de2c5','#ff3d8a','#ffc857','#8b6dff','#45ffb0','#ff7a45','#4cb8ff','#ff5454'];
+
+  ctx.clearRect(0,0,W,H);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(wheelAngle);
+  for(let i=0;i<n;i++){
+    const a0 = i*arc, a1 = a0 + arc;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,R,a0,a1);
+    ctx.closePath();
+    ctx.fillStyle = wheelSlices[i].tokens === 0 ? '#1a1f2b' : palette[i % palette.length];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.rotate(a0 + arc/2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = wheelSlices[i].tokens === 0 ? '#7c8699' : '#0a0d13';
+    ctx.font = 'bold 14px "JetBrains Mono", monospace';
+    ctx.fillText(wheelSlices[i].label, R - 14, 5);
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // hub + pointer
+  ctx.beginPath();
+  ctx.arc(cx, cy, 26, 0, Math.PI*2);
+  ctx.fillStyle = '#12161f';
+  ctx.fill();
+  ctx.strokeStyle = '#2de2c5';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + R - 4, cy);
+  ctx.lineTo(cx + R + 16, cy - 12);
+  ctx.lineTo(cx + R + 16, cy + 12);
+  ctx.closePath();
+  ctx.fillStyle = '#ffc857';
+  ctx.fill();
+}
+
+async function spinPrizeWheel(){
+  if(wheelSpinning) return;
+  const btn = document.getElementById('wheel-spin-btn');
+  const out = document.getElementById('wheel-result');
+  out.textContent = '';
+  wheelSpinning = true;
+  btn.disabled = true;
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/wheel/spin`, {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser })
+    });
+    const data = await res.json();
+    if(!res.ok){
+      out.textContent = data.error === 'Not enough tokens' ? "You can't afford a spin." : (data.error || 'Spin failed.');
+      wheelSpinning = false; btn.disabled = false;
+      return;
+    }
+    Sfx.play('whoosh');
+    // Animate to the slice the server picked — the visual never decides it.
+    const n = wheelSlices.length;
+    const arc = Math.PI*2 / n;
+    const target = -(data.index * arc + arc/2) + Math.PI*2*6;
+    const start = wheelAngle;
+    const t0 = performance.now();
+    const dur = 3200;
+    function frame(now){
+      const t = Math.min(1, (now - t0)/dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      wheelAngle = start + (target - start) * eased;
+      drawWheel();
+      if(t < 1){ requestAnimationFrame(frame); return; }
+      wheelAngle %= Math.PI*2;
+      wallet = data.wallet;
+      updateTokenDisplay();
+      document.getElementById('wheel-balance').textContent = '🪙 ' + wallet.tokens;
+      if(data.slice.tokens > 0){
+        out.textContent = data.slice.label + ' — +' + data.slice.tokens + ' tokens!';
+        toast('Prize wheel', '+' + data.slice.tokens + ' tokens', '🎡', 'gold');
+        Sfx.play(data.slice.tokens >= 500 ? 'win' : 'coin');
+      } else {
+        out.textContent = 'Bust — nothing this time.';
+        Sfx.play('lose');
+      }
+      announceAchievements(data.achievements);
+      loadDaily();
+      wheelSpinning = false;
+      btn.disabled = false;
+    }
+    requestAnimationFrame(frame);
+  }catch(e){
+    out.textContent = 'Could not reach the server.';
+    wheelSpinning = false;
+    btn.disabled = false;
+  }
+}
+
+/* =========================================================
+   PRESENCE + ACTIVITY TICKER
+   ========================================================= */
+let onlineList = [];
+let activityLastId = 0;
+let tickerQueue = [];
+let presenceTimer = null;
+
+function whereAmI(){
+  const cab = CABINETS.find(c=>c.screen === currentScreen);
+  if(cab) return cab.name;
+  if(currentScreen === 'dashboard-screen') return 'the arcade';
+  if(currentScreen === 'shop-screen') return 'the shop';
+  if(currentScreen === 'wheel-screen') return 'the prize wheel';
+  if(currentScreen === 'leaderboard-screen') return 'the leaderboard';
+  if(currentScreen === 'profile-screen') return 'their profile';
+  if(currentScreen === 'achievements-screen') return 'achievements';
+  return 'the arcade';
+}
+
+async function pingPresence(){
+  if(!currentUser) return;
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/presence`, {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser, where: whereAmI() })
+    });
+    if(!res.ok) return;
+    const data = await res.json();
+    onlineList = data.online || [];
+    renderPresence();
+  }catch(e){}
+}
+
+function renderPresence(){
+  const count = document.getElementById('chat-online-count');
+  if(count) count.textContent = onlineList.length;
+  const box = document.getElementById('chat-presence');
+  if(!box || box.classList.contains('hidden')) return;
+  box.innerHTML = onlineList.length
+    ? onlineList.map(o=>`
+        <div class="presence-item">
+          <span class="dot-online"></span>
+          <b>${escapeHtml(o.user)}</b>
+          <span>· ${escapeHtml(o.where)}</span>
+        </div>`).join('')
+    : '<div class="chat-note">Nobody else is here right now.</div>';
+}
+
+function toggleWhosOnline(){
+  const box = document.getElementById('chat-presence');
+  if(!box) return;
+  box.classList.toggle('hidden');
+  renderPresence();
+}
+
+async function pollActivity(){
+  if(!currentUser) return;
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/activity?since=${activityLastId}`, { headers: authHeaders() });
+    if(!res.ok) return;
+    const data = await res.json();
+    (data.events || []).forEach(ev=>{
+      activityLastId = Math.max(activityLastId, ev.id);
+      if(ev.user !== currentUser) tickerQueue.push(ev);
+    });
+    if(tickerQueue.length > 12) tickerQueue = tickerQueue.slice(-12);
+    cycleTicker();
+  }catch(e){}
+}
+
+let tickerIndex = 0;
+function cycleTicker(){
+  const body = document.getElementById('ticker-body');
+  if(!body) return;
+  if(!tickerQueue.length){
+    body.textContent = 'Nothing happening yet — be the first.';
+    return;
+  }
+  const ev = tickerQueue[tickerIndex % tickerQueue.length];
+  tickerIndex++;
+  body.textContent = `${ev.icon} ${ev.user} ${ev.text}`;
+}
+
+/* =========================================================
    ARCADE CHAT — a shared room for all keyholders
    =========================================================
    Same server-authoritative shape as the leaderboard: the client only ever
@@ -2375,6 +3334,21 @@ function escapeHtml(str){
   return String(str)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Turns @NAME into a highlight, and flags it harder when it's you.
+function highlightMentions(text){
+  let out = escapeHtml(text);
+  USERS.forEach(u=>{
+    const re = new RegExp('@' + u.replace(/[-_]/g, m=>'\\'+m), 'gi');
+    const mine = u === currentUser;
+    out = out.replace(re, `<b style="color:${mine ? 'var(--gold)' : 'var(--cyan)'};">@${u}</b>`);
+  });
+  return out;
+}
+
+function mentionsMe(text){
+  return currentUser && new RegExp('@' + currentUser.replace(/[-_]/g, m=>'\\'+m), 'i').test(text);
 }
 
 function chatTime(iso){
@@ -2435,13 +3409,17 @@ function renderChat(){
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
   log.innerHTML = chatMessages.map(m=>{
     const mine = m.user === currentUser;
+    // "/me does a thing" renders as an action line instead of a bubble.
+    if(m.text.startsWith('/me ')){
+      return `<div class="chat-note" style="text-align:left; color:var(--cyan);">✳ ${escapeHtml(m.user)} ${escapeHtml(m.text.slice(4))}</div>`;
+    }
     return `
       <div class="chat-msg ${mine?'me':''}">
         <div class="chat-msg-head">
-          <span class="chat-msg-user">${escapeHtml(m.user)}${mine?' (you)':''}</span>
+          <span class="chat-msg-user">${decorate(m.user)}${mine?' (you)':''}</span>
           <span class="chat-msg-time">${chatTime(m.at)}</span>
         </div>
-        <div class="chat-msg-body">${escapeHtml(m.text)}</div>
+        <div class="chat-msg-body">${highlightMentions(m.text)}</div>
       </div>
     `;
   }).join('');
@@ -2469,6 +3447,10 @@ async function refreshChat(force){
         chatUnread += fromOthers;
         updateChatBadge();
       }
+      // A message that @s you gets a toast even when the dock is minimised.
+      incoming.filter(m=>m.user !== currentUser && mentionsMe(m.text)).forEach(m=>{
+        toast(m.user + ' mentioned you', m.text.slice(0, 70), '💬', 'pink');
+      });
       if(fromOthers > 0 && !force) Sfx.play('coin', 1.25);
     } else if(force){
       renderChat();
@@ -2645,6 +3627,29 @@ async function earnTokens(reason, qty){
   }
 }
 
+let shopTab = 'themes';
+
+function openShop(){
+  stopAllGames();
+  showScreen('shop-screen');
+  renderShop();
+}
+
+function setShopTab(tab){
+  shopTab = tab;
+  document.querySelectorAll('#shop-tabs .tab').forEach(t=>{
+    t.classList.toggle('active', t.dataset.tab === tab);
+  });
+  renderShop();
+}
+
+const SHOP_NOTES = {
+  themes: "Tokens are earned by playing — wins pay more than losses, and Soccer goals/saves and your Runner/Asteroid scores chip in too. Unlocked themes swap the neon color scheme across the whole arcade.",
+  perks: "Perks are account-wide and apply in every cabinet, not just one. They stack with each game's own upgrades, and the server applies the payout ones so the numbers are always honest.",
+  titles: "Titles show next to your name in the chat room and on every leaderboard. Purely for bragging.",
+  emblems: "Emblems sit in front of your name in chat and on your profile card."
+};
+
 async function renderShop(){
   const grid = document.getElementById('shop-grid');
   const msg = document.getElementById('shop-message');
@@ -2652,6 +3657,11 @@ async function renderShop(){
   if(!shopCatalog) await loadShopItems();
   await loadWallet();
   document.getElementById('shop-balance').textContent = '🪙 ' + (wallet.tokens||0);
+  document.getElementById('shop-note').textContent = SHOP_NOTES[shopTab] || '';
+
+  if(shopTab === 'perks') return renderPerkShop(grid);
+  if(shopTab === 'titles') return renderCosmeticShop(grid, 'title');
+  if(shopTab === 'emblems') return renderCosmeticShop(grid, 'emblem');
 
   grid.innerHTML = Object.entries(shopCatalog).map(([id,item])=>{
     const owned = wallet.owned.includes(id);
@@ -2677,6 +3687,116 @@ async function renderShop(){
       </div>
     `;
   }).join('');
+}
+
+async function renderPerkShop(grid){
+  await loadPerkCatalog();
+  const owned = wallet.perks || {};
+  grid.innerHTML = Object.entries(perkCatalog).map(([id, p])=>{
+    const level = owned[id] || 0;
+    const maxed = level >= p.maxLevel;
+    const cost = maxed ? 0 : p.costs[level];
+    const canAfford = wallet.tokens >= cost;
+    const pips = Array.from({length:p.maxLevel}, (_,i)=>
+      `<span class="perk-pip ${i < level ? 'on':''}"></span>`).join('');
+    return `
+      <div class="perk-card">
+        <div class="perk-head">
+          <span class="perk-icon">${p.icon}</span>
+          <span class="perk-name">${p.name}</span>
+        </div>
+        <div class="perk-desc">${p.desc}</div>
+        <div class="perk-pips">${pips}</div>
+        ${maxed
+          ? `<button class="btn btn-secondary" disabled>Maxed · Lv ${level}</button>`
+          : `<button class="btn btn-primary" onclick="buyPerk('${id}')" ${canAfford?'':'disabled'}>Lv ${level}&rarr;${level+1} &middot; 🪙 ${cost}</button>`}
+      </div>`;
+  }).join('');
+}
+
+async function buyPerk(perkId){
+  const msg = document.getElementById('shop-message');
+  msg.textContent = '';
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/perks/purchase`, {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser, perkId })
+    });
+    const data = await res.json();
+    if(!res.ok){
+      msg.textContent = data.error === 'Not enough tokens' ? "You don't have enough tokens yet." : (data.error || 'Purchase failed.');
+      return;
+    }
+    wallet = data;
+    updateTokenDisplay();
+    const p = perkCatalog[perkId];
+    toast('Perk upgraded', p ? p.name + ' Lv ' + (wallet.perks[perkId]) : '', p ? p.icon : '🧪', 'gold');
+    Sfx.play('perfect');
+    announceAchievements(data.newAchievements);
+    renderShop();
+  }catch(e){ msg.textContent = 'Could not reach the server.'; }
+}
+
+async function renderCosmeticShop(grid, kind){
+  await loadCosmetics();
+  const catalog = kind === 'title' ? cosmeticCatalog.titles : cosmeticCatalog.emblems;
+  const ownedList = (kind === 'title' ? wallet.titles : wallet.emblems) || ['none'];
+  const equipped = kind === 'title' ? wallet.title : wallet.emblem;
+
+  grid.innerHTML = Object.entries(catalog).map(([id, item])=>{
+    const owned = ownedList.includes(id);
+    const isOn = equipped === id;
+    const preview = kind === 'title'
+      ? `<div class="shop-card-name" style="color:var(--gold); letter-spacing:1px; font-family:var(--font-mono); font-size:11px;">${item.text || '—'}</div>`
+      : `<div style="font-size:30px; line-height:1;">${item.icon || '—'}</div>`;
+    let btn;
+    if(isOn) btn = `<button class="btn btn-secondary" disabled>Equipped</button>`;
+    else if(owned) btn = `<button class="btn btn-secondary" onclick="equipCosmetic('${kind}','${id}')">Equip</button>`;
+    else {
+      const afford = wallet.tokens >= item.cost;
+      btn = `<button class="btn btn-primary" onclick="buyCosmetic('${kind}','${id}')" ${afford?'':'disabled'}>Buy &middot; 🪙 ${item.cost}</button>`;
+    }
+    return `
+      <div class="shop-card ${isOn?'shop-card-equipped':''}">
+        ${preview}
+        <div class="shop-card-name">${item.name}</div>
+        ${btn}
+      </div>`;
+  }).join('');
+}
+
+async function buyCosmetic(kind, id){
+  const msg = document.getElementById('shop-message');
+  msg.textContent = '';
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/cosmetics/purchase`, {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser, kind, id })
+    });
+    const data = await res.json();
+    if(!res.ok){
+      msg.textContent = data.error === 'Not enough tokens' ? "You don't have enough tokens yet." : (data.error || 'Purchase failed.');
+      return;
+    }
+    wallet = data;
+    updateTokenDisplay();
+    Sfx.play('coin');
+    toast('Unlocked & equipped', kind === 'title' ? 'New title' : 'New emblem', '✨', 'gold');
+    renderShop();
+  }catch(e){ msg.textContent = 'Could not reach the server.'; }
+}
+
+async function equipCosmetic(kind, id){
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/cosmetics/equip`, {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser, kind, id })
+    });
+    if(!res.ok) return;
+    wallet = await res.json();
+    Sfx.play('select');
+    renderShop();
+  }catch(e){}
 }
 
 async function handlePurchase(itemId){
@@ -2999,7 +4119,7 @@ async function renderLeaderboard(){
       const medal = i===0?'🥇':(i===1?'🥈':(i===2?'🥉':''));
       const me = r.name === currentUser ? ' style="color:var(--cyan)"' : '';
       const cells = cols.map(c=>`<td>${r[c]}</td>`).join('');
-      return `<tr class="${rankClass}"><td${me}><span class="rank-medal">${medal}</span>${r.name}</td>${cells}</tr>`;
+      return `<tr class="${rankClass}"><td${me}><span class="rank-medal">${medal}</span>${decorate(r.name)}</td>${cells}</tr>`;
     }).join('');
   }
 
@@ -3150,6 +4270,264 @@ function drawFacingSprite(ctx, img, x, y, facing, pivotX, pivotY, nativeW, nativ
 
 
 /* =========================================================
+   TOASTS — small notifications for coins, achievements, unlocks
+   ========================================================= */
+function toast(title, sub, icon, tone){
+  const stack = document.getElementById('toast-stack');
+  if(!stack) return;
+  const el = document.createElement('div');
+  el.className = 'toast' + (tone ? ' toast-' + tone : '');
+  el.innerHTML = `
+    <div class="toast-icon">${icon || '✨'}</div>
+    <div>
+      <div class="toast-title">${escapeHtml(title)}</div>
+      ${sub ? `<div class="toast-sub">${escapeHtml(sub)}</div>` : ''}
+    </div>`;
+  stack.appendChild(el);
+  // Never let a burst of unlocks stack past the top of the screen.
+  while(stack.children.length > 4) stack.removeChild(stack.firstChild);
+  setTimeout(()=>{
+    el.classList.add('leaving');
+    setTimeout(()=>el.remove(), 320);
+  }, 4200);
+}
+
+// Any endpoint can hand back `newAchievements`; this turns them into toasts
+// and pays the coin sound, so callers don't each need to handle it.
+function announceAchievements(list){
+  if(!Array.isArray(list) || !list.length) return;
+  list.forEach((a, i)=>{
+    setTimeout(()=>{
+      toast('Achievement · ' + a.name, '+' + a.reward + ' tokens', a.icon || '🎖', 'gold');
+      Sfx.play('perfect');
+    }, i * 450);
+  });
+}
+
+/* =========================================================
+   SCREEN TRANSITION — a quick CRT wipe between screens
+   ========================================================= */
+function playWipe(){
+  if(!settings.transitions) return;
+  const el = document.getElementById('screen-wipe');
+  if(!el) return;
+  el.classList.remove('run');
+  void el.offsetWidth;   // restart the animation
+  el.classList.add('run');
+}
+
+/* =========================================================
+   ANIMATED BACKGROUND — drifting neon field behind everything
+   ========================================================= */
+const ArcadeBg = (function(){
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas ? canvas.getContext('2d') : null;
+  let stars = [], w = 0, h = 0, rafId = null, t = 0;
+
+  function resize(){
+    if(!canvas) return;
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    const count = Math.min(90, Math.round(w * h / 24000));
+    stars = [];
+    for(let i=0;i<count;i++){
+      stars.push({
+        x: Math.random()*w,
+        y: Math.random()*h,
+        r: 0.6 + Math.random()*1.8,
+        speed: 0.06 + Math.random()*0.3,
+        drift: (Math.random()-0.5)*0.12,
+        hue: Math.random() < 0.5 ? 'cyan' : 'pink',
+        phase: Math.random()*Math.PI*2
+      });
+    }
+  }
+
+  function frame(){
+    if(!ctx) return;
+    t += 0.006;
+    ctx.clearRect(0,0,w,h);
+
+    // slow diagonal grid
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.strokeStyle = 'rgba(90,130,210,0.5)';
+    ctx.lineWidth = 1;
+    const step = 92;
+    const off = (t*22) % step;
+    for(let x=-step+off; x<w+step; x+=step){
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + h*0.32, h); ctx.stroke();
+    }
+    ctx.restore();
+
+    const cyan = getComputedStyle(document.documentElement).getPropertyValue('--cyan').trim() || '#2de2c5';
+    const pink = getComputedStyle(document.documentElement).getPropertyValue('--pink').trim() || '#ff3d8a';
+
+    stars.forEach(s=>{
+      s.y -= s.speed;
+      s.x += s.drift;
+      if(s.y < -4){ s.y = h + 4; s.x = Math.random()*w; }
+      if(s.x < -4) s.x = w + 4;
+      if(s.x > w + 4) s.x = -4;
+      const twinkle = 0.35 + Math.sin(t*3 + s.phase)*0.3;
+      ctx.globalAlpha = Math.max(0.08, twinkle);
+      ctx.fillStyle = s.hue === 'cyan' ? cyan : pink;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function start(){
+    if(!ctx || rafId) return;
+    resize();
+    frame();
+  }
+  function stop(){
+    if(rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    if(ctx) ctx.clearRect(0,0,w,h);
+  }
+
+  window.addEventListener('resize', resize);
+  return { start, stop };
+})();
+
+/* =========================================================
+   FX — shared juice layer every cabinet can draw through
+   =========================================================
+   One particle pool, one shake value and one floating-text list per canvas,
+   so a game gets impact effects by calling FX.burst()/FX.shake()/FX.text()
+   and then FX.draw() once per frame. */
+const FX = (function(){
+  const pools = new Map();   // canvas id -> state
+
+  function state(key){
+    if(!pools.has(key)) pools.set(key, { parts: [], texts: [], rings: [], shake: 0, hitStop: 0 });
+    return pools.get(key);
+  }
+
+  function reset(key){ pools.set(key, { parts: [], texts: [], rings: [], shake: 0, hitStop: 0 }); }
+
+  function burst(key, x, y, color, count, opts){
+    const s = state(key);
+    const o = opts || {};
+    const n = count == null ? 12 : count;
+    for(let i=0;i<n;i++){
+      const a = o.angle != null ? o.angle + (Math.random()-0.5)*(o.spread || Math.PI*2) : Math.random()*Math.PI*2;
+      const sp = (o.speed || 3) * (0.4 + Math.random());
+      s.parts.push({
+        x, y,
+        vx: Math.cos(a)*sp,
+        vy: Math.sin(a)*sp - (o.lift || 0),
+        life: 1,
+        decay: o.decay || (0.02 + Math.random()*0.03),
+        size: o.size || (1.5 + Math.random()*2.5),
+        gravity: o.gravity == null ? 0.06 : o.gravity,
+        color
+      });
+    }
+  }
+
+  function ring(key, x, y, color, maxR){
+    state(key).rings.push({ x, y, r: 2, max: maxR || 40, life: 1, color });
+  }
+
+  function text(key, x, y, str, color){
+    state(key).texts.push({ x, y, str, life: 1, color: color || '#ffffff' });
+  }
+
+  function shake(key, mag){
+    const s = state(key);
+    s.shake = Math.max(s.shake, mag);
+  }
+
+  function hitStop(key, frames){
+    const s = state(key);
+    s.hitStop = Math.max(s.hitStop, frames);
+  }
+
+  // Returns true if the game should skip its own update this frame.
+  function frozen(key){
+    const s = state(key);
+    if(s.hitStop > 0){ s.hitStop--; return true; }
+    return false;
+  }
+
+  function applyShake(ctx, key){
+    const s = state(key);
+    if(!settings.shake || s.shake <= 0) return;
+    ctx.translate((Math.random()-0.5)*s.shake, (Math.random()-0.5)*s.shake);
+  }
+
+  function step(key){
+    const s = state(key);
+    if(s.shake > 0) s.shake = Math.max(0, s.shake - 0.85);
+    for(let i=s.parts.length-1;i>=0;i--){
+      const p = s.parts[i];
+      p.x += p.vx; p.y += p.vy;
+      p.vy += p.gravity;
+      p.vx *= 0.985; p.vy *= 0.985;
+      p.life -= p.decay;
+      if(p.life <= 0) s.parts.splice(i,1);
+    }
+    for(let i=s.rings.length-1;i>=0;i--){
+      const r = s.rings[i];
+      r.r += (r.max - r.r) * 0.22;
+      r.life -= 0.06;
+      if(r.life <= 0) s.rings.splice(i,1);
+    }
+    for(let i=s.texts.length-1;i>=0;i--){
+      const t = s.texts[i];
+      t.y -= 0.8;
+      t.life -= 0.022;
+      if(t.life <= 0) s.texts.splice(i,1);
+    }
+  }
+
+  // Draw particles/rings/text on top of whatever the game already rendered.
+  function draw(ctx, key){
+    const s = state(key);
+    step(key);
+    ctx.save();
+    s.rings.forEach(r=>{
+      ctx.globalAlpha = Math.max(0, r.life) * 0.7;
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = 2.5 * r.life;
+      ctx.shadowColor = r.color;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
+      ctx.stroke();
+    });
+    s.parts.forEach(p=>{
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 9;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * (0.4 + p.life*0.6), 0, Math.PI*2);
+      ctx.fill();
+    });
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 15px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    s.texts.forEach(t=>{
+      ctx.globalAlpha = Math.max(0, Math.min(1, t.life*1.6));
+      ctx.fillStyle = t.color;
+      ctx.shadowColor = t.color;
+      ctx.shadowBlur = 10;
+      ctx.fillText(t.str, t.x, t.y);
+    });
+    ctx.restore();
+  }
+
+  return { burst, ring, text, shake, hitStop, frozen, applyShake, draw, reset };
+})();
+
+/* =========================================================
    SFX — tiny procedural sound engine (no audio files)
    =========================================================
    Every sound is synthesised on the fly with WebAudio, so the page stays a
@@ -3255,7 +4633,7 @@ const Sfx = (function(){
    SETTINGS (sound / scanlines / screen shake)
    ========================================================= */
 const SETTINGS_KEY = 'level7_settings';
-let settings = { sound: true, scanlines: true, shake: true };
+let settings = { sound: true, scanlines: true, shake: true, transitions: true, bg: true };
 
 function loadSettings(){
   try{
@@ -3271,12 +4649,15 @@ function saveSettings(){
 
 function applySettings(){
   document.body.classList.toggle('no-scanlines', !settings.scanlines);
+  document.body.classList.toggle('no-bg', !settings.bg);
+  if(settings.bg) ArcadeBg.start(); else ArcadeBg.stop();
   const sb = document.getElementById('sound-toggle-btn');
   if(sb){
     sb.textContent = settings.sound ? '🔊' : '🔇';
     sb.title = settings.sound ? 'Mute sound' : 'Unmute sound';
   }
-  [['sound','setting-sound'],['scanlines','setting-scanlines'],['shake','setting-shake']].forEach(([key,id])=>{
+  [['sound','setting-sound'],['scanlines','setting-scanlines'],['shake','setting-shake'],
+   ['transitions','setting-transitions'],['bg','setting-bg']].forEach(([key,id])=>{
     const el = document.getElementById(id);
     if(el) el.classList.toggle('on', !!settings[key]);
   });
@@ -3302,6 +4683,29 @@ document.addEventListener('click', e=>{
 function applyShake(ctx, mag){
   if(!settings.shake || !mag || mag <= 0) return;
   ctx.translate((Math.random()-0.5)*mag, (Math.random()-0.5)*mag);
+}
+
+/* =========================================================
+   SECOND WIND — the revive perk, shared by every solo cabinet
+   =========================================================
+   A game calls this at the very top of its gameOver(); if the player has
+   revives left this run, the callback puts them back on their feet and the
+   game returns early instead of ending. */
+let revivesUsed = {};
+
+function resetRevives(){ revivesUsed = {}; }
+
+function reviveIfPossible(gameKey, restore){
+  const available = Perks.revives();
+  if(!available) return false;
+  const used = revivesUsed[gameKey] || 0;
+  if(used >= available) return false;
+  revivesUsed[gameKey] = used + 1;
+  restore();
+  FX.text(gameKey, 0, 0, '', '#fff');   // ensures the pool exists for this key
+  toast('Second Wind', 'Revived — ' + (available - used - 1) + ' left this run', '💨', 'gold');
+  Sfx.play('win');
+  return true;
 }
 
 /* =========================================================
@@ -3773,6 +5177,7 @@ const SoccerGame = (function(){
     document.getElementById('soccer-result-text').textContent = p1Won ? 'YOU WIN!' : (mode==='single' ? 'BOT WINS' : 'PLAYER 2 WINS');
     document.getElementById('soccer-result-sub').textContent = `Final score ${scoreP1} : ${scoreP2} vs ${oppName}.`;
     document.getElementById('soccer-play').classList.add('hidden');
+    runComplete('soccer', p1Won ? 'win' : 'loss', (p1Won ? 'won' : 'lost') + ' a Street Soccer match ' + scoreP1 + '-' + scoreP2);
     document.getElementById('soccer-result').classList.remove('hidden');
   }
 
@@ -3804,6 +5209,11 @@ const SoccerGame = (function(){
     const inGoalY = ball.y > GOAL_TOP && ball.y < GOAL_BOTTOM;
     if(ball.x - BALL_R <= GOAL_LINE_L && inGoalY){
       scoreP2++;
+      FX.burst('soccer', ball.x, ball.y, '#ff3d8a', 26, {speed:5, gravity:0.12});
+      FX.ring('soccer', ball.x, ball.y, '#ff3d8a', 70);
+      FX.text('soccer', ball.x, ball.y-26, 'GOAL!', '#ffc857');
+      FX.shake('soccer', 12);
+      Sfx.play('thud');
       resetPositions();
       updateHud();
       checkWin();
@@ -3811,6 +5221,11 @@ const SoccerGame = (function(){
     }
     if(ball.x + BALL_R >= GOAL_LINE_R && inGoalY){
       scoreP1++; matchGoalsP1++;
+      FX.burst('soccer', ball.x, ball.y, '#2de2c5', 26, {speed:5, gravity:0.12});
+      FX.ring('soccer', ball.x, ball.y, '#2de2c5', 70);
+      FX.text('soccer', ball.x, ball.y-26, 'GOAL!', '#ffc857');
+      FX.shake('soccer', 12);
+      Sfx.play('perfect');
       resetPositions();
       updateHud();
       checkWin();
@@ -3881,7 +5296,7 @@ const SoccerGame = (function(){
   function loop(){
     if(!running) return;
     if(!paused) update();
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'soccer'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -4106,6 +5521,7 @@ const RacingGame = (function(){
     document.getElementById('racing-result-text').textContent = p1Won ? 'YOU WIN THE RACE!' : (mode==='single' ? 'BOT WINS THE RACE' : 'RIVAL WINS THE RACE');
     document.getElementById('racing-result-sub').textContent = 'You: ' + Math.min(p1.laps,LAPS_TO_WIN) + ' laps · Opponent: ' + Math.min(p2.laps,LAPS_TO_WIN) + ' laps.';
     document.getElementById('racing-play').classList.add('hidden');
+    runComplete('racing', p1Won ? 'win' : 'loss', (p1Won ? 'won' : 'lost') + ' an Apex Loop race');
     document.getElementById('racing-result').classList.remove('hidden');
   }
 
@@ -4241,7 +5657,7 @@ const RacingGame = (function(){
   function loop(){
     if(!running) return;
     if(!paused) update();
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'racing'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -4470,6 +5886,11 @@ const TankGame = (function(){
         if(d <= HIT_RADIUS){
           remove = true;
           if(b.owner === 'p1'){ hitsP1++; } else { hitsP2++; }
+          FX.burst('tank', b.x, b.y, '#ffc857', 24, {speed:4.5, gravity:0});
+          FX.ring('tank', b.x, b.y, '#ff7a45', 60);
+          FX.shake('tank', 14);
+          FX.hitStop('tank', 4);
+          Sfx.play('explode');
           updateHud();
           spawnPositions();
           if(hitsP1 >= WIN_HITS){ endMatch(true); return; }
@@ -4488,6 +5909,7 @@ const TankGame = (function(){
     document.getElementById('tank-result-text').textContent = p1Won ? 'YOU WIN THE DUEL!' : (mode==='single'?'BOT WINS THE DUEL':'PLAYER 2 WINS THE DUEL');
     document.getElementById('tank-result-sub').textContent = 'Final hits ' + hitsP1 + ' : ' + hitsP2 + '.';
     document.getElementById('tank-play').classList.add('hidden');
+    runComplete('tank', p1Won ? 'win' : 'loss', (p1Won ? 'won' : 'lost') + ' a Tank Duel ' + hitsP1 + '-' + hitsP2);
     document.getElementById('tank-result').classList.remove('hidden');
   }
 
@@ -4536,7 +5958,7 @@ const TankGame = (function(){
   function loop(){
     if(!running) return;
     if(!paused) update();
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'tank'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -4666,6 +6088,7 @@ const RunnerGame = (function(){
   }
 
   function gameOver(){
+    if(reviveIfPossible('runner', ()=>{ obstacles.length = 0; FX.burst('runner', player.x, player.y, '#ffc857', 26, {speed:4}); })) return;
     running = false;
     updateStat('runner', [{stat:'highScore', type:'max', value:score}]);
     zipReactToScore('runner', 'highScore', score);
@@ -4673,6 +6096,7 @@ const RunnerGame = (function(){
     document.getElementById('runner-result-text').textContent = 'RUN OVER';
     document.getElementById('runner-result-sub').textContent = 'You cleared ' + score + ' obstacle' + (score===1?'':'s') + '.';
     document.getElementById('runner-play').classList.add('hidden');
+    runComplete('runner', 'run', 'cleared ' + score + ' obstacles in Hop Runner');
     document.getElementById('runner-result').classList.remove('hidden');
   }
 
@@ -4709,7 +6133,7 @@ const RunnerGame = (function(){
   function loop(){
     if(!running) return;
     if(!paused) update();
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'runner'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -4758,7 +6182,7 @@ const AsteroidGame = (function(){
     bullets = [];
     asteroids = [];
     particles = [];
-    lives = MAX_LIVES;
+    lives = MAX_LIVES + Perks.extraGuard();
     shotCount = 0;
     spawnTimer = 80;
     frameCount = 0;
@@ -4923,6 +6347,9 @@ const AsteroidGame = (function(){
           bullets.splice(j,1);
           asteroids.splice(i,1);
           spawnParticles(a.x, a.y, '#ffc857');
+          FX.burst('asteroid', a.x, a.y, '#ffc857', 14, {speed:3.8, gravity:0.02});
+          FX.ring('asteroid', a.x, a.y, '#a0e4ff', 42);
+          FX.shake('asteroid', 4);
           shotCount++;
           updateHud();
           hit = true;
@@ -4940,6 +6367,7 @@ const AsteroidGame = (function(){
   }
 
   function gameOver(){
+    if(reviveIfPossible('asteroid', ()=>{ lives = 1; asteroids.length = 0; updateHud(); })) return;
     running = false;
     updateStat('asteroid', [{stat:'highScore', type:'max', value:shotCount}]);
     zipReactToScore('asteroid', 'highScore', shotCount);
@@ -4947,6 +6375,7 @@ const AsteroidGame = (function(){
     document.getElementById('asteroid-result-text').textContent = 'SHIELDS DOWN!';
     document.getElementById('asteroid-result-sub').textContent = 'You blasted ' + shotCount + ' asteroid' + (shotCount===1?'':'s') + ' before the platform was overwhelmed.';
     document.getElementById('asteroid-play').classList.add('hidden');
+    runComplete('asteroid', 'run', 'blasted ' + shotCount + ' asteroids');
     document.getElementById('asteroid-result').classList.remove('hidden');
   }
 
@@ -5068,7 +6497,7 @@ const AsteroidGame = (function(){
   function loop(){
     if(!running) return;
     if(!paused) update();
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'asteroid'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -5127,7 +6556,7 @@ const BreakerGame = (function(){
   function freshState(){
     paddleX = W/2 - PADDLE_W/2;
     bricks = buildBricks();
-    lives = MAX_LIVES;
+    lives = MAX_LIVES + Perks.extraGuard();
     score = 0;
     level = 1;
     resetBall();
@@ -5155,6 +6584,7 @@ const BreakerGame = (function(){
   }
 
   function gameOver(){
+    if(reviveIfPossible('breaker', ()=>{ lives = 1; resetBall(); updateHud(); })) return;
     running = false;
     updateStat('breaker', [{stat:'highScore', type:'max', value:score}]);
     zipReactToScore('breaker', 'highScore', score);
@@ -5162,6 +6592,7 @@ const BreakerGame = (function(){
     document.getElementById('breaker-result-text').textContent = 'BOARD OVER';
     document.getElementById('breaker-result-sub').textContent = `You broke ${score} brick${score===1?'':'s'} across ${level} board${level===1?'':'s'}.`;
     document.getElementById('breaker-play').classList.add('hidden');
+    runComplete('breaker', 'run', 'broke ' + score + ' bricks in Neon Breaker');
     document.getElementById('breaker-result').classList.remove('hidden');
   }
 
@@ -5199,6 +6630,9 @@ const BreakerGame = (function(){
          ball.y + BALL_RADIUS > b.y && ball.y - BALL_RADIUS < b.y + b.h){
         b.alive = false;
         score++;
+        FX.burst('breaker', b.x + b.w/2, b.y + b.h/2, b.color || '#f45d9c', 12, {speed:3.2, gravity:0.09});
+        FX.shake('breaker', 3);
+        Sfx.play('hit', 1.6);
         const overlapLeft = (ball.x + BALL_RADIUS) - b.x;
         const overlapRight = (b.x + b.w) - (ball.x - BALL_RADIUS);
         const overlapTop = (ball.y + BALL_RADIUS) - b.y;
@@ -5264,7 +6698,7 @@ const BreakerGame = (function(){
   function loop(){
     if(!running) return;
     if(!paused) update();
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'breaker'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -5693,6 +7127,7 @@ const WildDuelGame = (function(){
     document.getElementById('wildduel-result-text').textContent = p1Won ? 'YOU WIN THE DUEL!' : (mode==='single' ? 'BOT WINS THE DUEL' : 'PLAYER 2 WINS THE DUEL');
     document.getElementById('wildduel-result-sub').textContent = 'Final HP ' + Math.max(hp1,0) + ' : ' + Math.max(hp2,0) + '.';
     document.getElementById('wildduel-play').classList.add('hidden');
+    runComplete('wildduel', p1Won ? 'win' : 'loss', (p1Won ? 'won' : 'lost') + ' a Wild Duel');
     document.getElementById('wildduel-result').classList.remove('hidden');
     updateBanner(null);
   }
@@ -5837,7 +7272,7 @@ const WildDuelGame = (function(){
   function loop(){
     if(!running) return;
     if(!paused) update();
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'wildduel'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -6132,6 +7567,10 @@ const RoguelikeGame = (function(){
     if(e.hp <= 0){
       e.dead = true;
       kills++;
+      FX.burst('roguelike', e.x, e.y, e.isElite ? '#ffc857' : '#ff5454', e.isElite ? 26 : 15, {speed:3.6, gravity:0.05});
+      FX.ring('roguelike', e.x, e.y, e.isElite ? '#ffc857' : '#ff5454', e.isElite ? 60 : 38);
+      FX.shake('roguelike', e.isElite ? 10 : 5);
+      Sfx.play('explode', 1.3);
       if(e.isElite){
         const spot = { x: e.x, y: e.y };
         const item = { x: spot.x, y: spot.y, kind: Math.random() < 0.5 ? 'rare' : 'equipment' };
@@ -6166,6 +7605,7 @@ const RoguelikeGame = (function(){
     document.getElementById('roguelike-result-sub').textContent =
       `Reached floor ${floorNum} with ${kills} kill${kills===1?'':'s'} and ${lootCollected} loot pickup${lootCollected===1?'':'s'}.`;
     document.getElementById('roguelike-play').classList.add('hidden');
+    runComplete('roguelike', 'run', 'reached floor ' + floorNum + ' of the Crypt');
     document.getElementById('roguelike-result').classList.remove('hidden');
   }
 
@@ -6473,7 +7913,7 @@ const RoguelikeGame = (function(){
   function loop(){
     if(!running) return;
     if(!paused) update();
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'roguelike'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -6600,6 +8040,7 @@ const CometGame = (function(){
   }
 
   function gameOver(){
+    if(reviveIfPossible('comet', ()=>{ comets.length = 0; FX.ring('comet', ship.x, ship.y, '#ffc857', 90); })) return;
     running = false;
     updateStat('comet', [{stat:'highScore', type:'max', value:score}]);
     zipReactToScore('comet', 'highScore', score);
@@ -6608,6 +8049,7 @@ const CometGame = (function(){
     document.getElementById('comet-result-sub').textContent =
       `You scored ${score} and dodged ${dodged} comet${dodged===1?'':'s'}.`;
     document.getElementById('comet-play').classList.add('hidden');
+    runComplete('comet', 'run', 'scored ' + score + ' in Comet Dodge');
     document.getElementById('comet-result').classList.remove('hidden');
   }
 
@@ -6700,7 +8142,7 @@ const CometGame = (function(){
   function loop(){
     if(!running) return;
     if(!paused) update();
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'comet'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -6790,7 +8232,7 @@ const TunnelGame = (function(){
     speed = cfg.speed;
     score = 0;
     mult = 1;
-    shields = MAX_SHIELDS;
+    shields = MAX_SHIELDS + Perks.extraGuard();
     boost = 100;
     boosting = false;
     barriers = [];
@@ -7010,6 +8452,7 @@ const TunnelGame = (function(){
   }
 
   function gameOver(){
+    if(reviveIfPossible('tunnel', ()=>{ shields = 1; invuln = 2.2; barriers.length = 0; updateHud(); })) return;
     running = false;
     const finalScore = Math.floor(score);
     updateStat('tunnel', [{stat:'highScore', type:'max', value:finalScore}]);
@@ -7021,6 +8464,7 @@ const TunnelGame = (function(){
       'Score ' + finalScore + ' on ' + DIFFS[difficulty].label + ' — ' + gatesCleared +
       ' gate' + (gatesCleared===1?'':'s') + ' threaded, ' + cellsTaken + ' energy cell' + (cellsTaken===1?'':'s') + ' collected.';
     document.getElementById('tunnel-play').classList.add('hidden');
+    runComplete('tunnel', 'run', 'scored ' + finalScore + ' in Hyper Tunnel');
     document.getElementById('tunnel-result').classList.remove('hidden');
     refreshCabinets();
   }
@@ -7228,7 +8672,7 @@ const TunnelGame = (function(){
     const dt = Math.min(0.05, (now - lastTime)/1000);
     lastTime = now;
     if(!paused) update(dt);
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'tunnel'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -7670,6 +9114,7 @@ const DepthsGame = (function(){
   }
 
   function gameOver(){
+    if(reviveIfPossible('depths', ()=>{ hp = MAX_HP; ammo = MAG_SIZE; reloading = false; bolts.length = 0; updateHud(); })) return;
     running = false;
     updateStat('depths', [{stat:'bestWave', type:'max', value:wave}]);
     zipReactToScore('depths', 'bestWave', wave);
@@ -7679,6 +9124,7 @@ const DepthsGame = (function(){
     document.getElementById('depths-result-sub').textContent =
       'Wave ' + wave + ' on ' + DIFFS[difficulty].label + ' — ' + kills + ' kill' + (kills===1?'':'s') + ' before the depths took you.';
     document.getElementById('depths-play').classList.add('hidden');
+    runComplete('depths', 'run', 'reached wave ' + wave + ' in Neon Depths');
     document.getElementById('depths-result').classList.remove('hidden');
     refreshCabinets();
   }
@@ -7967,7 +9413,7 @@ const DepthsGame = (function(){
     const dt = Math.min(0.05, (now - lastTime)/1000);
     lastTime = now;
     if(!paused) update(dt);
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'depths'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -8215,6 +9661,7 @@ const StackGame = (function(){
     document.getElementById('stack-result-sub').textContent =
       'You stacked ' + height + ' block' + (height===1?'':'s') + ', best perfect streak ×' + bestCombo + '.';
     document.getElementById('stack-play').classList.add('hidden');
+    runComplete('stack', 'run', 'stacked ' + height + ' blocks in Sky Stack');
     document.getElementById('stack-result').classList.remove('hidden');
     refreshCabinets();
   }
@@ -8308,7 +9755,7 @@ const StackGame = (function(){
     const dt = Math.min(0.05, (now - lastTime)/1000);
     lastTime = now;
     if(!paused) update(dt);
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'stack'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -8605,6 +10052,7 @@ const GolfGame = (function(){
     document.getElementById('golf-result-sub').textContent =
       'You sank ' + holesSunk + ' hole' + (holesSunk===1?'':'s') + ' and banked ' + banked + ' spare shot' + (banked===1?'':'s') + ' along the way.';
     document.getElementById('golf-play').classList.add('hidden');
+    runComplete('golf', 'run', 'sank ' + holesSunk + ' holes in Gravity Golf');
     document.getElementById('golf-result').classList.remove('hidden');
     refreshCabinets();
   }
@@ -8797,7 +10245,7 @@ const GolfGame = (function(){
     const dt = Math.min(0.05, (now - lastTime)/1000);
     lastTime = now;
     if(!paused) update(dt);
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'golf'); }
     rafId = requestAnimationFrame(loop);
   }
 
@@ -9163,6 +10611,7 @@ const SumoGame = (function(){
     document.getElementById('sumo-result-text').textContent = p1Won ? 'YOU TAKE THE MATCH!' : (mode==='single' ? 'BOT TAKES THE MATCH' : 'PLAYER 2 TAKES THE MATCH');
     document.getElementById('sumo-result-sub').textContent = 'Final ring-outs ' + scoreP1 + ' : ' + scoreP2 + '.';
     document.getElementById('sumo-play').classList.add('hidden');
+    runComplete('sumo', p1Won ? 'win' : 'loss', (p1Won ? 'won' : 'lost') + ' a Neon Sumo match ' + scoreP1 + '-' + scoreP2);
     document.getElementById('sumo-result').classList.remove('hidden');
     document.getElementById('sumo-banner').classList.add('hidden');
     refreshCabinets();
@@ -9312,7 +10761,7 @@ const SumoGame = (function(){
     const dt = Math.min(0.05, (now - lastTime)/1000);
     lastTime = now;
     if(!paused) update(dt);
-    if(running) render();
+    if(running){ render(); FX.draw(ctx, 'sumo'); }
     rafId = requestAnimationFrame(loop);
   }
 

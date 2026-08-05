@@ -265,7 +265,16 @@ const SHOP_ITEMS = {
   zip: { name: 'Zip', cost: 3000, cyan: '#ff2e2e', pink: '#ffffff', gold: '#ff2e2e', bg: '#0a0a0a', bgPanel: '#141414', bgPanelRaised: '#1e1e1e', border: '#2a2a2a', taunts: true }
 };
 
-const DEFAULT_WALLET = { tokens: 0, owned: ['neon'], equipped: 'neon', asteroidUpgrades: { extraLife: 0, turnSpeed: 0, autoTurret: 0 }, wildduelUpgrades: { extraHp: 0, fasterReload: 0, fasterMovement: 0 }, roguelikeUpgrades: { extraHp: 0, swordDamage: 0, magicPower: 0, swiftBoots: 0 } };
+const DEFAULT_WALLET = {
+  tokens: 0,
+  owned: ['neon'], equipped: 'neon',
+  asteroidUpgrades: { extraLife: 0, turnSpeed: 0, autoTurret: 0 },
+  wildduelUpgrades: { extraHp: 0, fasterReload: 0, fasterMovement: 0 },
+  roguelikeUpgrades: { extraHp: 0, swordDamage: 0, magicPower: 0, swiftBoots: 0 },
+  perks: { coinMagnet: 0, secondWind: 0, extraGuard: 0, insurance: 0, luckyStreak: 0, streakSaver: 0 },
+  titles: ['none'], title: 'none',
+  emblems: ['none'], emblem: 'none'
+};
 
 // Wild Duel upgrades apply to whichever user is logged in (their "p1"
 // fighter) in both Single Player and Local Multiplayer — the bot / local
@@ -369,10 +378,311 @@ const ROGUELIKE_UPGRADES = {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Perks — global, coin-bought, and they apply in *every* cabinet
+// ---------------------------------------------------------------------------
+// Unlike the per-game upgrade tracks above, perks are account-wide. Same
+// server-is-authoritative rule: the client asks to buy one by id, the server
+// owns the price and the effect. The client reads the levels back and applies
+// the numbers, but the server re-derives anything that touches the wallet.
+const PERKS = {
+  coinMagnet: {
+    name: 'Coin Magnet',
+    desc: '+15% tokens from everything you play, per level',
+    icon: '🧲',
+    maxLevel: 3,
+    costs: [200, 400, 700]
+  },
+  secondWind: {
+    name: 'Second Wind',
+    desc: 'One free revive per solo run, per level',
+    icon: '💨',
+    maxLevel: 2,
+    costs: [350, 800]
+  },
+  extraGuard: {
+    name: 'Extra Guard',
+    desc: '+1 starting life in Asteroid Blaster and Neon Breaker, +1 shield in Hyper Tunnel, per level',
+    icon: '❤️',
+    maxLevel: 2,
+    costs: [250, 520]
+  },
+  insurance: {
+    name: 'Insurance',
+    desc: 'Losing a versus match still pays out like a win, per level +40%',
+    icon: '🛡',
+    maxLevel: 2,
+    costs: [250, 500]
+  },
+  luckyStreak: {
+    name: 'Lucky Streak',
+    desc: '+8% chance of a bonus payout at the end of any run, per level',
+    icon: '🍀',
+    maxLevel: 3,
+    costs: [180, 360, 640]
+  },
+  streakSaver: {
+    name: 'Streak Saver',
+    desc: 'Your daily streak survives one missed day',
+    icon: '📅',
+    maxLevel: 1,
+    costs: [600]
+  }
+};
+
+const DEFAULT_PERKS = { coinMagnet: 0, secondWind: 0, extraGuard: 0, insurance: 0, luckyStreak: 0, streakSaver: 0 };
+
+// Cosmetic titles + emblems shown next to your name in chat and on the
+// leaderboard. Purely decorative; some are bought, some are achievement locked.
+const TITLES = {
+  none:      { name: 'No Title',        cost: 0,    text: '' },
+  rookie:    { name: 'Rookie',          cost: 50,   text: 'ROOKIE' },
+  regular:   { name: 'Regular',         cost: 150,  text: 'REGULAR' },
+  hotshot:   { name: 'Hotshot',         cost: 400,  text: 'HOTSHOT' },
+  veteran:   { name: 'Veteran',         cost: 800,  text: 'VETERAN' },
+  menace:    { name: 'Menace',          cost: 1200, text: 'MENACE' },
+  legend:    { name: 'Legend',          cost: 2500, text: 'LEGEND' },
+  keyholder: { name: 'Keyholder Prime', cost: 5000, text: 'KEYHOLDER PRIME' }
+};
+
+const EMBLEMS = {
+  none:    { name: 'None',      cost: 0,    icon: '' },
+  spade:   { name: 'Spade',     cost: 80,   icon: '♠' },
+  bolt:    { name: 'Bolt',      cost: 120,  icon: '⚡' },
+  skull:   { name: 'Skull',     cost: 200,  icon: '💀' },
+  star:    { name: 'Star',      cost: 300,  icon: '⭐' },
+  fire:    { name: 'Fire',      cost: 450,  icon: '🔥' },
+  crown:   { name: 'Crown',     cost: 900,  icon: '👑' },
+  diamond: { name: 'Diamond',   cost: 1500, icon: '💎' },
+  galaxy:  { name: 'Galaxy',    cost: 3000, icon: '🌌' }
+};
+
+// ---------------------------------------------------------------------------
+// Achievements
+// ---------------------------------------------------------------------------
+// Each one is a pure function of a player's record, so progress is recomputed
+// from the stats we already store rather than tracked separately — that means
+// they backfill correctly for players who earned them before this shipped.
+const ACHIEVEMENTS = [
+  { id:'first_blood',   name:'First Blood',      desc:'Win any versus match',                 reward:50,   icon:'🥊', goal:1,    value:d => totalVersusWins(d) },
+  { id:'brawler',       name:'Brawler',          desc:'Win 10 versus matches',                reward:150,  icon:'🥋', goal:10,   value:d => totalVersusWins(d) },
+  { id:'champion',      name:'Arena Champion',   desc:'Win 50 versus matches',                reward:600,  icon:'🏆', goal:50,   value:d => totalVersusWins(d) },
+  { id:'sharpshooter',  name:'Sharpshooter',     desc:'Shoot 100 asteroids in one run',       reward:120,  icon:'🌠', goal:100,  value:d => d.asteroid.highScore },
+  { id:'bricklayer',    name:'Bricklayer',       desc:'Break 200 bricks in one run',          reward:150,  icon:'🧱', goal:200,  value:d => d.breaker.highScore },
+  { id:'hopper',        name:'Hopper',           desc:'Clear 50 obstacles in Hop Runner',     reward:120,  icon:'🏃', goal:50,   value:d => d.runner.highScore },
+  { id:'stargazer',     name:'Stargazer',        desc:'Score 500 in Comet Dodge',             reward:150,  icon:'☄️', goal:500,  value:d => d.comet.highScore },
+  { id:'delver',        name:'Delver',           desc:'Reach floor 5 in Crypt Crawler',       reward:120,  icon:'⚔️', goal:5,    value:d => d.roguelike.deepestFloor },
+  { id:'deep_delver',   name:'Deep Delver',      desc:'Reach floor 15 in Crypt Crawler',      reward:500,  icon:'🗝', goal:15,   value:d => d.roguelike.deepestFloor },
+  { id:'tunnel_rat',    name:'Tunnel Rat',       desc:'Score 10,000 in Hyper Tunnel',         reward:200,  icon:'🌀', goal:10000,value:d => d.tunnel.highScore },
+  { id:'lightspeed',    name:'Lightspeed',       desc:'Score 50,000 in Hyper Tunnel',         reward:700,  icon:'💫', goal:50000,value:d => d.tunnel.highScore },
+  { id:'survivor',      name:'Survivor',         desc:'Reach wave 5 in Neon Depths',          reward:200,  icon:'👁', goal:5,    value:d => d.depths.bestWave },
+  { id:'exterminator',  name:'Exterminator',     desc:'Reach wave 12 in Neon Depths',         reward:700,  icon:'☣️', goal:12,   value:d => d.depths.bestWave },
+  { id:'architect',     name:'Architect',        desc:'Stack 15 blocks in Sky Stack',         reward:200,  icon:'🏗', goal:15,   value:d => d.stack.bestHeight },
+  { id:'skyscraper',    name:'Skyscraper',       desc:'Stack 30 blocks in Sky Stack',         reward:700,  icon:'🌆', goal:30,   value:d => d.stack.bestHeight },
+  { id:'birdie',        name:'Birdie',           desc:'Sink 5 holes in Gravity Golf',         reward:200,  icon:'🪐', goal:5,    value:d => d.golf.bestHoles },
+  { id:'tour_pro',      name:'Tour Pro',         desc:'Sink 15 holes in Gravity Golf',        reward:700,  icon:'⛳', goal:15,   value:d => d.golf.bestHoles },
+  { id:'striker',       name:'Striker',          desc:'Score 25 goals in Street Soccer',      reward:200,  icon:'⚽', goal:25,   value:d => d.soccer.goals },
+  { id:'keeper',        name:'Keeper',           desc:'Make 25 saves in Street Soccer',       reward:200,  icon:'🧤', goal:25,   value:d => d.soccer.saves },
+  { id:'jack_of_all',   name:'Jack of All Games',desc:'Put a score on every cabinet',         reward:800,  icon:'🎰', goal:14,   value:d => cabinetsPlayed(d) },
+  { id:'high_roller',   name:'High Roller',      desc:'Hold 5,000 tokens at once',            reward:400,  icon:'🪙', goal:5000, value:d => d.wallet.tokens },
+  { id:'collector',     name:'Collector',        desc:'Own 5 themes',                         reward:300,  icon:'🎨', goal:5,    value:d => (d.wallet.owned || []).length },
+  { id:'perked_up',     name:'Perked Up',        desc:'Buy 5 perk levels',                    reward:350,  icon:'🧪', goal:5,    value:d => perkLevels(d) },
+  { id:'decorated',     name:'Decorated',        desc:'Unlock 10 achievements',               reward:500,  icon:'🎖', goal:10,   value:d => (d.achievements || []).length }
+];
+
+function totalVersusWins(d){
+  return (d.soccer.wins||0) + (d.racing.wins||0) + (d.tank.wins||0) + (d.wildduel.wins||0) + (d.sumo.wins||0);
+}
+function cabinetsPlayed(d){
+  return Object.keys(DEFAULT_STATS).filter(game => {
+    const rec = d[game] || {};
+    return Object.keys(DEFAULT_STATS[game]).some(k => (rec[k] || 0) > 0);
+  }).length;
+}
+function perkLevels(d){
+  const p = (d.wallet && d.wallet.perks) || {};
+  return Object.keys(PERKS).reduce((n, id) => n + (p[id] || 0), 0);
+}
+
+// Recomputes every achievement against a player record, credits the reward for
+// anything newly earned, and returns what was just unlocked so the client can
+// pop a toast for it.
+function evaluateAchievements(record){
+  if (!Array.isArray(record.achievements)) record.achievements = [];
+  const newly = [];
+  for (const a of ACHIEVEMENTS) {
+    if (record.achievements.includes(a.id)) continue;
+    let value = 0;
+    try { value = a.value(record) || 0; } catch (e) { value = 0; }
+    if (value >= a.goal) {
+      record.achievements.push(a.id);
+      record.wallet.tokens += a.reward;
+      newly.push({ id: a.id, name: a.name, icon: a.icon, reward: a.reward });
+    }
+  }
+  return newly;
+}
+
+function achievementProgress(record){
+  return ACHIEVEMENTS.map(a => {
+    let value = 0;
+    try { value = a.value(record) || 0; } catch (e) { value = 0; }
+    return {
+      id: a.id, name: a.name, desc: a.desc, icon: a.icon,
+      reward: a.reward, goal: a.goal,
+      value: Math.min(value, a.goal),
+      earned: (record.achievements || []).includes(a.id)
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Daily bonus + daily challenges
+// ---------------------------------------------------------------------------
+const DAILY_BASE = 100;
+const DAILY_STREAK_BONUS = 25;   // per consecutive day, capped below
+const DAILY_STREAK_CAP = 7;
+
+function todayKey(){
+  return new Date().toISOString().slice(0, 10);
+}
+function yesterdayKey(){
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// Challenges are picked deterministically from the date, so everyone gets the
+// same three each day without needing to store a generated set.
+const CHALLENGE_POOL = [
+  { id:'play3',      desc:'Finish 3 runs or matches today',        reward:120, goal:3,    track:'plays' },
+  { id:'play6',      desc:'Finish 6 runs or matches today',        reward:220, goal:6,    track:'plays' },
+  { id:'win1',       desc:'Win a versus match today',              reward:150, goal:1,    track:'wins' },
+  { id:'win3',       desc:'Win 3 versus matches today',            reward:300, goal:3,    track:'wins' },
+  { id:'earn200',    desc:'Earn 200 tokens today',                 reward:150, goal:200,  track:'earned' },
+  { id:'earn500',    desc:'Earn 500 tokens today',                 reward:320, goal:500,  track:'earned' },
+  { id:'try3',       desc:'Play 3 different cabinets today',       reward:200, goal:3,    track:'distinct' },
+  { id:'try5',       desc:'Play 5 different cabinets today',       reward:380, goal:5,    track:'distinct' },
+  { id:'chat',       desc:'Say something in the arcade chat',      reward:80,  goal:1,    track:'chats' },
+  { id:'spin',       desc:'Spin the prize wheel once',             reward:100, goal:1,    track:'spins' }
+];
+
+function dailyChallengeIds(dateKey){
+  // Cheap deterministic hash of the date -> three distinct pool entries.
+  let h = 0;
+  for (let i = 0; i < dateKey.length; i++) h = (h * 31 + dateKey.charCodeAt(i)) >>> 0;
+  const picked = [];
+  let cursor = h;
+  while (picked.length < 3) {
+    cursor = (cursor * 1103515245 + 12345) >>> 0;
+    const idx = cursor % CHALLENGE_POOL.length;
+    if (!picked.includes(CHALLENGE_POOL[idx].id)) picked.push(CHALLENGE_POOL[idx].id);
+  }
+  return picked;
+}
+
+function freshDaily(){
+  return { date: todayKey(), plays: 0, wins: 0, earned: 0, chats: 0, spins: 0, cabinets: [], claimed: [] };
+}
+
+// Rolls the per-day counters over when the date changes.
+function currentDaily(record){
+  if (!record.daily || record.daily.date !== todayKey()) record.daily = freshDaily();
+  if (!Array.isArray(record.daily.cabinets)) record.daily.cabinets = [];
+  if (!Array.isArray(record.daily.claimed)) record.daily.claimed = [];
+  return record.daily;
+}
+
+function challengeState(record){
+  const daily = currentDaily(record);
+  return dailyChallengeIds(daily.date).map(id => {
+    const c = CHALLENGE_POOL.find(x => x.id === id);
+    const value = c.track === 'distinct' ? daily.cabinets.length : (daily[c.track] || 0);
+    return {
+      id: c.id, desc: c.desc, reward: c.reward, goal: c.goal,
+      value: Math.min(value, c.goal),
+      done: value >= c.goal,
+      claimed: daily.claimed.includes(c.id)
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Prize wheel
+// ---------------------------------------------------------------------------
+const WHEEL_COST = 120;
+const WHEEL_SLICES = [
+  { label:'Bust',      tokens:0,   weight:16 },
+  { label:'+40',       tokens:40,  weight:20 },
+  { label:'+80',       tokens:80,  weight:18 },
+  { label:'+120',      tokens:120, weight:16 },
+  { label:'+200',      tokens:200, weight:12 },
+  { label:'+320',      tokens:320, weight:9  },
+  { label:'+500',      tokens:500, weight:6  },
+  { label:'JACKPOT',   tokens:1200,weight:3  }
+];
+
+function spinWheel(){
+  const total = WHEEL_SLICES.reduce((n, s) => n + s.weight, 0);
+  let roll = Math.random() * total;
+  for (let i = 0; i < WHEEL_SLICES.length; i++) {
+    roll -= WHEEL_SLICES[i].weight;
+    if (roll <= 0) return i;
+  }
+  return WHEEL_SLICES.length - 1;
+}
+
+// ---------------------------------------------------------------------------
+// Presence + activity feed (both in-memory — they're live state, not history)
+// ---------------------------------------------------------------------------
+const presence = new Map();      // username -> { where, at }
+const PRESENCE_TTL_MS = 45 * 1000;
+const activity = [];             // newest last
+const ACTIVITY_MAX = 40;
+
+function pushActivity(user, text, icon){
+  activity.push({ id: activity.length ? activity[activity.length - 1].id + 1 : 1, user, text, icon: icon || '🎮', at: new Date().toISOString() });
+  while (activity.length > ACTIVITY_MAX) activity.shift();
+}
+
+function livePresence(){
+  const now = Date.now();
+  const out = [];
+  for (const [user, rec] of presence) {
+    if (now - rec.at > PRESENCE_TTL_MS) { presence.delete(user); continue; }
+    out.push({ user, where: rec.where });
+  }
+  return out;
+}
+
 // Password required to edit the Update Log through the secret admin panel.
 // Override by setting ADMIN_PASSWORD in the environment before starting the server.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ADMIN_123';
 const DEFAULT_UPDATELOG = `=== LEVEL 7 UPDATE LOG ===
+
+[2026-07-30] BIG UPDATE — the arcade is no longer just a game library.
+
+  PERKS — a new Perks tab in the shop. Bought with coins, they apply account-wide in every cabinet:
+    • Coin Magnet — +15% tokens from everything you play, per level
+    • Second Wind — a free revive per solo run, per level
+    • Extra Guard — +1 starting life in Asteroid Blaster and Neon Breaker, +1 shield in Hyper Tunnel
+    • Insurance — losing a versus match still pays out like a win
+    • Lucky Streak — a chance of a bonus payout at the end of any run
+    • Streak Saver — your daily streak survives one missed day
+
+  DAILY BONUS — claim coins once a day; the payout climbs with your streak.
+  DAILY CHALLENGES — three rotating objectives every day, each worth coins. Everyone gets the same three.
+  ACHIEVEMENTS — 24 of them, each paying coins. They backfill, so anything you'd already done is credited the first time you look.
+  PROFILE — your emblem, title, cabinet bests, day streak and last 25 runs in one place.
+  TITLES & EMBLEMS — two more shop tabs. Both show next to your name in chat and on every leaderboard.
+  PRIZE WHEEL — spend 120 coins for a spin. The slice is picked server-side, so nobody can rig it. Jackpot pays 1200.
+
+  WHO'S ONLINE — the chat dock now shows who else is in the arcade and which cabinet they're on.
+  LIVE TICKER — recent results scroll across the top of the dashboard.
+  CHAT — @mentions highlight (and toast you when it's your name), and "/me does a thing" renders as an action line.
+
+  VISUALS — a new shared effects layer runs in all 14 cabinets: particle bursts, shockwave rings, floating score text, screen shake and hit-stop. Goals, tank hits, shattered asteroids, broken bricks and crypt kills all land properly now.
+  Plus an animated starfield behind the whole site, a CRT wipe between screens, and toast notifications for coins, unlocks and achievements. All of it can be switched off in Settings.
 
 [2026-07-30] ARCADE CHAT — there's now a live chat room docked in the corner of every screen. Everyone signed in shares it, messages arrive within a few seconds, and it remembers whether you had it open. Minimise it and a badge counts anything you missed.
 
@@ -476,6 +786,10 @@ function freshUserRecord() {
   const rec = JSON.parse(JSON.stringify(DEFAULT_STATS));
   rec.wallet = JSON.parse(JSON.stringify(DEFAULT_WALLET));
   rec.banned = false;
+  rec.achievements = [];
+  rec.daily = freshDaily();
+  rec.streak = { count: 0, lastClaim: '' };
+  rec.history = [];
   return rec;
 }
 
@@ -527,7 +841,23 @@ async function loadData() {
           if (typeof w.roguelikeUpgrades[id] !== 'number') w.roguelikeUpgrades[id] = 0;
         });
       }
+      // Perks and cosmetics were added later — backfill them the same way.
+      if (!w.perks || typeof w.perks !== 'object') w.perks = Object.assign({}, DEFAULT_PERKS);
+      Object.keys(PERKS).forEach(id => {
+        if (typeof w.perks[id] !== 'number') w.perks[id] = 0;
+      });
+      if (!Array.isArray(w.titles)) w.titles = ['none'];
+      if (!w.titles.includes('none')) w.titles.push('none');
+      if (!w.title || !w.titles.includes(w.title)) w.title = 'none';
+      if (!Array.isArray(w.emblems)) w.emblems = ['none'];
+      if (!w.emblems.includes('none')) w.emblems.push('none');
+      if (!w.emblem || !w.emblems.includes(w.emblem)) w.emblem = 'none';
     }
+    // Progression fields, same backfill idea.
+    if (!Array.isArray(data[u].achievements)) data[u].achievements = [];
+    if (!data[u].daily || typeof data[u].daily !== 'object') data[u].daily = freshDaily();
+    if (!data[u].streak || typeof data[u].streak !== 'object') data[u].streak = { count: 0, lastClaim: '' };
+    if (!Array.isArray(data[u].history)) data[u].history = [];
   });
   return data;
 }
@@ -882,6 +1212,13 @@ app.post('/api/chat', async (req, res) => {
         [CHAT_KEEP_ROWS]
       ).catch(() => {});
     }
+    // Counts toward the "say something in chat" daily challenge.
+    withWriteLock(async () => {
+      const data = await loadData();
+      currentDaily(data[user]).chats++;
+      await saveData(data);
+    }).catch(() => {});
+
     const from = Math.max(0, parseInt(since, 10) || 0);
     const messages = from > 0
       ? await loadChatSince(from)
@@ -924,20 +1261,340 @@ app.post('/api/wallet/earn', async (req, res) => {
   flagIfSuspicious(user, 'wallet/earn:' + reason);
   const cap = REASON_QTY_CAPS[reason] ?? 500;
   const safeQty = Math.max(0, Math.min(cap, Number(qty) || 0));
-  const amount = Math.round(REWARDS[reason] * safeQty);
+  const base = Math.round(REWARDS[reason] * safeQty);
 
   try {
     const updated = await withWriteLock(async () => {
       const data = await loadData();
-      data[user].wallet.tokens += amount;
+      const record = data[user];
+      // The Coin Magnet perk is applied here, server-side, so the payout can
+      // never be inflated by a client claiming a perk level it doesn't own.
+      const magnet = 1 + 0.15 * (record.wallet.perks.coinMagnet || 0);
+      // Insurance turns a losing payout into something closer to a win.
+      const isLoss = /_loss$/.test(reason);
+      const insurance = isLoss ? (1 + 0.4 * (record.wallet.perks.insurance || 0)) : 1;
+      const amount = Math.round(base * magnet * insurance);
+
+      record.wallet.tokens += amount;
+      const daily = currentDaily(record);
+      daily.earned += amount;
+      const unlocked = evaluateAchievements(record);
       await saveData(data);
-      return data[user].wallet;
+      return { wallet: record.wallet, earned: amount, achievements: unlocked };
     });
-    res.json(updated);
+    // Old clients read the wallet fields straight off the response body, so
+    // keep those at the top level and hang the new bits alongside them.
+    res.json(Object.assign({}, updated.wallet, { earnedAmount: updated.earned, newAchievements: updated.achievements }));
   } catch (e) {
     console.error('Earn failed:', e);
     res.status(500).json({ error: 'Internal error' });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Run completion — one call at the end of a run or match
+// ---------------------------------------------------------------------------
+// Kept separate from /leaderboard/update because several cabinets post stats
+// more than once per run (Neon Depths posts every wave). This fires exactly
+// once, so daily counters and the activity feed stay honest.
+app.post('/api/run/complete', async (req, res) => {
+  const { user, game, result, summary } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  if (!DEFAULT_STATS[game]) return res.status(400).json({ error: 'Unknown game' });
+  flagIfSuspicious(user, 'run/complete');
+
+  try {
+    const out = await withWriteLock(async () => {
+      const data = await loadData();
+      const record = data[user];
+      const daily = currentDaily(record);
+      daily.plays++;
+      if (result === 'win') daily.wins++;
+      if (!daily.cabinets.includes(game)) daily.cabinets.push(game);
+
+      record.history.unshift({
+        game,
+        result: result === 'win' ? 'win' : (result === 'loss' ? 'loss' : 'run'),
+        summary: typeof summary === 'string' ? summary.slice(0, 120) : '',
+        at: new Date().toISOString()
+      });
+      record.history = record.history.slice(0, 25);
+
+      // Lucky Streak: a small chance of a bonus payout at the end of a run.
+      let bonus = 0;
+      const luck = 0.08 * (record.wallet.perks.luckyStreak || 0);
+      if (luck > 0 && Math.random() < luck) {
+        bonus = 50 + Math.floor(Math.random() * 150);
+        record.wallet.tokens += bonus;
+      }
+
+      const unlocked = evaluateAchievements(record);
+      await saveData(data);
+      return { wallet: record.wallet, bonus, achievements: unlocked, challenges: challengeState(record) };
+    });
+
+    if (typeof summary === 'string' && summary) {
+      pushActivity(user, summary.slice(0, 120), result === 'win' ? '🏆' : '🎮');
+    }
+    res.json(out);
+  } catch (e) {
+    console.error('Run complete failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Perks
+// ---------------------------------------------------------------------------
+app.get('/api/perks', (req, res) => res.json(PERKS));
+
+app.post('/api/perks/purchase', async (req, res) => {
+  const { user, perkId } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  try {
+    const out = await withWriteLock(async () => {
+      const data = await loadData();
+      const result = purchaseLeveledUpgrade(data[user].wallet, PERKS, 'perks', perkId);
+      if (result.error) return result;
+      const unlocked = evaluateAchievements(data[user]);
+      await saveData(data);
+      return { wallet: data[user].wallet, achievements: unlocked };
+    });
+    if (out.error) return res.status(400).json({ error: out.error });
+    res.json(Object.assign({}, out.wallet, { newAchievements: out.achievements }));
+  } catch (e) {
+    console.error('Perk purchase failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Cosmetics (titles + emblems)
+// ---------------------------------------------------------------------------
+app.get('/api/cosmetics', (req, res) => res.json({ titles: TITLES, emblems: EMBLEMS }));
+
+function cosmeticTables(kind){
+  if (kind === 'title') return { catalog: TITLES, owned: 'titles', equipped: 'title' };
+  if (kind === 'emblem') return { catalog: EMBLEMS, owned: 'emblems', equipped: 'emblem' };
+  return null;
+}
+
+app.post('/api/cosmetics/purchase', async (req, res) => {
+  const { user, kind, id } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  const t = cosmeticTables(kind);
+  if (!t || !t.catalog[id]) return res.status(400).json({ error: 'Unknown item' });
+  try {
+    const out = await withWriteLock(async () => {
+      const data = await loadData();
+      const w = data[user].wallet;
+      if (!Array.isArray(w[t.owned])) w[t.owned] = ['none'];
+      if (w[t.owned].includes(id)) return { error: 'Already owned' };
+      const cost = t.catalog[id].cost;
+      if (w.tokens < cost) return { error: 'Not enough tokens' };
+      w.tokens -= cost;
+      w[t.owned].push(id);
+      w[t.equipped] = id;
+      await saveData(data);
+      return { wallet: w };
+    });
+    if (out.error) return res.status(400).json({ error: out.error });
+    res.json(out.wallet);
+  } catch (e) {
+    console.error('Cosmetic purchase failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/cosmetics/equip', async (req, res) => {
+  const { user, kind, id } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  const t = cosmeticTables(kind);
+  if (!t || !t.catalog[id]) return res.status(400).json({ error: 'Unknown item' });
+  try {
+    const out = await withWriteLock(async () => {
+      const data = await loadData();
+      const w = data[user].wallet;
+      if (!w[t.owned].includes(id)) return { error: 'You do not own that' };
+      w[t.equipped] = id;
+      await saveData(data);
+      return { wallet: w };
+    });
+    if (out.error) return res.status(400).json({ error: out.error });
+    res.json(out.wallet);
+  } catch (e) {
+    console.error('Cosmetic equip failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Achievements / daily / profile
+// ---------------------------------------------------------------------------
+app.get('/api/achievements', async (req, res) => {
+  const user = req.query.user;
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  const data = await loadData();
+  res.json({ achievements: achievementProgress(data[user]) });
+});
+
+app.get('/api/daily', async (req, res) => {
+  const user = req.query.user;
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  const data = await loadData();
+  const record = data[user];
+  const streak = record.streak || { count: 0, lastClaim: '' };
+  res.json({
+    canClaim: streak.lastClaim !== todayKey(),
+    streak: streak.count || 0,
+    nextReward: DAILY_BASE + DAILY_STREAK_BONUS * Math.min(DAILY_STREAK_CAP, streak.lastClaim === yesterdayKey() ? (streak.count || 0) : 0),
+    challenges: challengeState(record)
+  });
+});
+
+app.post('/api/daily/claim', async (req, res) => {
+  const { user } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  try {
+    const out = await withWriteLock(async () => {
+      const data = await loadData();
+      const record = data[user];
+      const streak = record.streak || (record.streak = { count: 0, lastClaim: '' });
+      if (streak.lastClaim === todayKey()) return { error: 'Already claimed today' };
+      // Missing a day resets the run; claiming yesterday extends it. The
+      // Streak Saver perk forgives exactly one missed day.
+      const saver = (record.wallet.perks.streakSaver || 0) > 0;
+      const gapDate = new Date();
+      gapDate.setUTCDate(gapDate.getUTCDate() - 2);
+      const twoDaysAgo = gapDate.toISOString().slice(0, 10);
+      const continues = streak.lastClaim === yesterdayKey() || (saver && streak.lastClaim === twoDaysAgo);
+      streak.count = continues ? (streak.count || 0) + 1 : 1;
+      streak.lastClaim = todayKey();
+      const reward = DAILY_BASE + DAILY_STREAK_BONUS * Math.min(DAILY_STREAK_CAP, streak.count - 1);
+      record.wallet.tokens += reward;
+      currentDaily(record).earned += reward;
+      const unlocked = evaluateAchievements(record);
+      await saveData(data);
+      return { wallet: record.wallet, reward, streak: streak.count, achievements: unlocked };
+    });
+    if (out.error) return res.status(400).json({ error: out.error });
+    res.json(out);
+  } catch (e) {
+    console.error('Daily claim failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/daily/challenge/claim', async (req, res) => {
+  const { user, id } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  try {
+    const out = await withWriteLock(async () => {
+      const data = await loadData();
+      const record = data[user];
+      const state = challengeState(record).find(c => c.id === id);
+      if (!state) return { error: 'Not one of today\'s challenges' };
+      if (state.claimed) return { error: 'Already claimed' };
+      if (!state.done) return { error: 'Not finished yet' };
+      const daily = currentDaily(record);
+      daily.claimed.push(id);
+      record.wallet.tokens += state.reward;
+      daily.earned += state.reward;
+      const unlocked = evaluateAchievements(record);
+      await saveData(data);
+      return { wallet: record.wallet, reward: state.reward, challenges: challengeState(record), achievements: unlocked };
+    });
+    if (out.error) return res.status(400).json({ error: out.error });
+    res.json(out);
+  } catch (e) {
+    console.error('Challenge claim failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.get('/api/profile', async (req, res) => {
+  const user = req.query.user;
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  const data = await loadData();
+  const record = data[user];
+  const progress = achievementProgress(record);
+  res.json({
+    user,
+    stats: Object.fromEntries(Object.keys(DEFAULT_STATS).map(g => [g, record[g]])),
+    wallet: record.wallet,
+    history: record.history || [],
+    streak: record.streak || { count: 0 },
+    achievementsEarned: progress.filter(a => a.earned).length,
+    achievementsTotal: progress.length,
+    versusWins: totalVersusWins(record),
+    cabinetsPlayed: cabinetsPlayed(record),
+    title: (TITLES[record.wallet.title] || TITLES.none).text,
+    emblem: (EMBLEMS[record.wallet.emblem] || EMBLEMS.none).icon
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Prize wheel
+// ---------------------------------------------------------------------------
+app.get('/api/wheel', (req, res) => res.json({ cost: WHEEL_COST, slices: WHEEL_SLICES.map(s => ({ label: s.label, tokens: s.tokens })) }));
+
+app.post('/api/wheel/spin', async (req, res) => {
+  const { user } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  flagIfSuspicious(user, 'wheel/spin');
+  try {
+    const out = await withWriteLock(async () => {
+      const data = await loadData();
+      const record = data[user];
+      if (record.wallet.tokens < WHEEL_COST) return { error: 'Not enough tokens' };
+      record.wallet.tokens -= WHEEL_COST;
+      // The winning slice is picked here, never by the client.
+      const index = spinWheel();
+      const slice = WHEEL_SLICES[index];
+      record.wallet.tokens += slice.tokens;
+      const daily = currentDaily(record);
+      daily.spins++;
+      if (slice.tokens > 0) daily.earned += slice.tokens;
+      const unlocked = evaluateAchievements(record);
+      await saveData(data);
+      return { wallet: record.wallet, index, slice: { label: slice.label, tokens: slice.tokens }, achievements: unlocked };
+    });
+    if (out.error) return res.status(400).json({ error: out.error });
+    if (out.slice.tokens >= 500) pushActivity(user, `hit ${out.slice.label} on the prize wheel`, '🎡');
+    res.json(out);
+  } catch (e) {
+    console.error('Wheel spin failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Presence + activity feed
+// ---------------------------------------------------------------------------
+app.post('/api/presence', (req, res) => {
+  const { user, where } = req.body || {};
+  const authed = authenticate(req);
+  if (!authed || authed !== user) return res.status(401).json({ error: 'Not authenticated' });
+  presence.set(user, { where: typeof where === 'string' ? where.slice(0, 40) : 'the arcade', at: Date.now() });
+  res.json({ online: livePresence() });
+});
+
+app.get('/api/presence', (req, res) => {
+  if (!authenticate(req)) return res.status(401).json({ error: 'Not authenticated' });
+  res.json({ online: livePresence() });
+});
+
+app.get('/api/activity', (req, res) => {
+  if (!authenticate(req)) return res.status(401).json({ error: 'Not authenticated' });
+  const since = Math.max(0, parseInt(req.query.since, 10) || 0);
+  res.json({ events: activity.filter(a => a.id > since) });
 });
 
 app.post('/api/shop/purchase', async (req, res) => {
@@ -1195,12 +1852,16 @@ app.post('/api/admin/reset-player', async (req, res) => {
       const banned = data[user].banned; // a stats/wallet reset shouldn't lift a ban
       if (scope === 'stats' || scope === 'all') {
         Object.keys(DEFAULT_STATS).forEach(game => { data[user][game] = fresh[game]; });
+        data[user].achievements = [];
+        data[user].history = [];
       }
       if (scope === 'wallet' || scope === 'all') {
         data[user].wallet = fresh.wallet;
       }
       if (scope === 'all') {
         data[user].banned = banned;
+        data[user].daily = freshDaily();
+        data[user].streak = { count: 0, lastClaim: '' };
       }
       await saveData(data);
     });
@@ -1216,7 +1877,8 @@ app.post('/api/admin/reset-player', async (req, res) => {
 const UPGRADE_CATALOGS = {
   asteroidUpgrades: ASTEROID_UPGRADES,
   wildduelUpgrades: WILDDUEL_UPGRADES,
-  roguelikeUpgrades: ROGUELIKE_UPGRADES
+  roguelikeUpgrades: ROGUELIKE_UPGRADES,
+  perks: PERKS
 };
 app.post('/api/admin/max-upgrades', async (req, res) => {
   const { password, user } = req.body || {};
