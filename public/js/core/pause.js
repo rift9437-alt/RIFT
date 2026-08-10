@@ -26,6 +26,12 @@ function currentGameModule(){
     case 'tactics-screen': return TacticsGame;
     case 'runeduel-screen': return RuneDuelGame;
     case 'warlord-screen': return WarlordGame;
+    case 'evolution-screen': return EvolutionGame;
+    case 'flood-screen': return FloodGame;
+    case 'hoops-screen': return HoopsGame;
+    case 'burger-screen': return BurgerGame;
+    case 'tag-screen': return TagGame;
+    case 'robot-screen': return RobotGame;
     default: return null;
   }
 }

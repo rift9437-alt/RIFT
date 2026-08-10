@@ -259,7 +259,22 @@ const LB_BOARDS = [
   { game:'depths',    title:'👁 Neon Depths',      cols:[['bestWave','Best Wave']] },
   { game:'stack',     title:'🏗 Sky Stack',        cols:[['bestHeight','Best Height']] },
   { game:'golf',      title:'🪐 Gravity Golf',     cols:[['bestHoles','Holes Sunk']] },
-  { game:'sumo',      title:'🥏 Neon Sumo',        cols:[['wins','Wins']] }
+  { game:'sumo',      title:'🥏 Neon Sumo',        cols:[['wins','Wins']] },
+  { game:'towerdefense', title:'🏰 Tower Defense', cols:[['bestWave','Best Wave']] },
+  { game:'parkour',   title:'🥷 Ninja Parkour',    cols:[['bestTime','Best Time']] },
+  { game:'zombie',    title:'🧟 Zombie Survival',  cols:[['bestWave','Best Wave']] },
+  { game:'pirate',    title:'🏴‍☠️ Pirate Voyage',   cols:[['bestTreasure','Treasure']] },
+  { game:'samurai',   title:'🗡 Samurai Showdown', cols:[['wins','Wins']] },
+  { game:'policechase', title:'🚔 Police Chase',   cols:[['highScore','High Score']] },
+  { game:'tactics',   title:'♟️ Tactics Grid',     cols:[['wins','Wins']] },
+  { game:'runeduel',  title:'🔮 Rune Duel',        cols:[['wins','Wins']] },
+  { game:'warlord',   title:'🗺️ Warlord',          cols:[['wins','Wins']] },
+  { game:'evolution', title:'🧬 Evolution',        cols:[['bestStage','Best Stage']] },
+  { game:'flood',     title:'🌊 Flood Escape',     cols:[['bestRooms','Rooms']] },
+  { game:'hoops',     title:'🏀 Buzzer Beater',    cols:[['highScore','High Score']] },
+  { game:'burger',    title:'🍔 Burger Rush',      cols:[['highScore','Served']] },
+  { game:'tag',       title:'🏃 Neon Tag',         cols:[['wins','Wins']] },
+  { game:'robot',     title:'🤖 Robot Arena',      cols:[['bestRound','Best Round']] }
 ];
 
 async function renderLeaderboard(){

@@ -45,4 +45,10 @@ function stopAllGames(){
   TacticsGame.stop();
   RuneDuelGame.stop();
   WarlordGame.stop();
+  EvolutionGame.stop();
+  FloodGame.stop();
+  HoopsGame.stop();
+  BurgerGame.stop();
+  TagGame.stop();
+  RobotGame.stop();
 }

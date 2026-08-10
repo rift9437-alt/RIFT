@@ -422,3 +422,27 @@ body.glitching .dash-content{animation:glitch-shift .5s steps(2) 2;}
   animation:loader-slide .62s linear infinite;
 }
 @keyframes loader-slide{from{transform:translateX(-100%);} to{transform:translateX(320%);}}
+
+/* ---------- evolution trait picker ---------- */
+#evolution-choice{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:10px;
+  background:rgba(4,10,8,0.82); border-radius:8px;
+}
+.evo-title{
+  font-family:var(--font-display); font-size:16px; letter-spacing:2px;
+  color:var(--gold); margin-bottom:6px; text-shadow:0 0 14px rgba(255,200,87,.6);
+}
+.evo-card{
+  display:flex; align-items:center; gap:12px; width:300px;
+  background:var(--bg-panel); border:1px solid var(--border); border-radius:10px;
+  padding:12px 14px; cursor:pointer; color:var(--text); text-align:left;
+  font-family:var(--font-body); font-size:13px;
+}
+.evo-card:hover{border-color:var(--cyan); box-shadow:0 0 14px rgba(45,226,197,.25);}
+.evo-icon{font-size:22px;}
+.evo-desc{font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim);}
+.evo-key{
+  margin-left:auto; font-family:var(--font-mono); font-size:10px;
+  border:1px solid var(--border); border-radius:4px; padding:2px 6px; color:var(--text-dim);
+}

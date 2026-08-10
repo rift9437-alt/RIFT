@@ -181,7 +181,13 @@ const STAT_CEILINGS = {
   tunnel: { highScore: 250000 },
   depths: { bestWave: 200 },
   stack: { bestHeight: 500 },
-  golf: { bestHoles: 200 }
+  golf: { bestHoles: 200 },
+  policechase: { highScore: 100000 },
+  hoops: { highScore: 5000 },
+  burger: { highScore: 2000 },
+  flood: { bestRooms: 500 },
+  evolution: { bestStage: 7 },
+  robot: { bestRound: 500 }
 };
 const MAX_INCREMENT_PER_CALL = 5;
 
@@ -205,7 +211,22 @@ const REASON_QTY_CAPS = {
   stack_block: 5,
   golf_hole: 5,
   sumo_win: 1, sumo_loss: 1,
-  secret_found: 1
+  secret_found: 1,
+  towerdefense_wave: 1,
+  parkour_gate: 30, parkour_finish: 1,
+  zombie_wave: 1, zombie_kill: 200, zombie_boss: 1,
+  pirate_treasure: 50, pirate_skeleton: 50,
+  samurai_win: 1, samurai_loss: 1,
+  policechase_cash: 200, policechase_distance: 5000,
+  tactics_win: 1, tactics_loss: 1, tactics_unit_kill: 20,
+  runeduel_win: 1, runeduel_loss: 1, runeduel_creature_kill: 40,
+  warlord_win: 1, warlord_loss: 1, warlord_territory: 40,
+  evolution_dna: 400,
+  flood_room: 1,
+  hoops_basket: 1,
+  burger_order: 1,
+  tag_win: 1, tag_loss: 1,
+  robot_win: 1
 };
 
 const DEFAULT_STATS = {
@@ -231,7 +252,13 @@ const DEFAULT_STATS = {
   policechase: { highScore: 0 },
   tactics: { wins: 0, losses: 0 },
   runeduel: { wins: 0, losses: 0 },
-  warlord: { wins: 0, losses: 0 }
+  warlord: { wins: 0, losses: 0 },
+  evolution: { bestStage: 0 },
+  flood: { bestRooms: 0 },
+  hoops: { highScore: 0 },
+  burger: { highScore: 0 },
+  tag: { wins: 0, losses: 0 },
+  robot: { bestRound: 0 }
 };
 
 // ---------------------------------------------------------------------------
@@ -274,7 +301,13 @@ const REWARDS = {
   policechase_distance: 0.2, // per block of distance survived
   tactics_win: 25, tactics_loss: 6, tactics_unit_kill: 3,
   runeduel_win: 25, runeduel_loss: 6, runeduel_creature_kill: 1.5,
-  warlord_win: 30, warlord_loss: 6, warlord_territory: 2 // per territory conquered
+  warlord_win: 30, warlord_loss: 6, warlord_territory: 2, // per territory conquered
+  evolution_dna: 0.4,     // per bit of biomass eaten that run
+  flood_room: 12,         // per flooded room escaped
+  hoops_basket: 2,        // per basket sunk
+  burger_order: 4,        // per order served correctly
+  tag_win: 20, tag_loss: 5,
+  robot_win: 15           // per arena round won
 };
 
 const SHOP_ITEMS = {
@@ -354,8 +387,8 @@ const ACHIEVEMENTS = {
 
 // Reasons in REWARDS that count as a "competitive win" or "competitive loss"
 // for the purposes of the win-streak achievement.
-const WIN_REASONS = ['soccer_win', 'racing_win', 'tank_win', 'wildduel_win', 'sumo_win', 'samurai_win', 'tactics_win', 'runeduel_win', 'warlord_win'];
-const LOSS_REASONS = ['soccer_loss', 'racing_loss', 'tank_loss', 'wildduel_loss', 'sumo_loss', 'samurai_loss', 'tactics_loss', 'runeduel_loss', 'warlord_loss'];
+const WIN_REASONS = ['soccer_win', 'racing_win', 'tank_win', 'wildduel_win', 'sumo_win', 'samurai_win', 'tactics_win', 'runeduel_win', 'warlord_win', 'tag_win'];
+const LOSS_REASONS = ['soccer_loss', 'racing_loss', 'tank_loss', 'wildduel_loss', 'sumo_loss', 'samurai_loss', 'tactics_loss', 'runeduel_loss', 'warlord_loss', 'tag_loss'];
 
 // Evaluates every achievement for a user against the freshest data, unlocks
 // any newly-earned ones, and applies their rewards. Mutates `data[user]` —
@@ -532,7 +565,13 @@ const REASON_TO_GAME = {
   policechase_cash: 'policechase', policechase_distance: 'policechase',
   tactics_win: 'tactics', tactics_loss: 'tactics', tactics_unit_kill: 'tactics',
   runeduel_win: 'runeduel', runeduel_loss: 'runeduel', runeduel_creature_kill: 'runeduel',
-  warlord_win: 'warlord', warlord_loss: 'warlord', warlord_territory: 'warlord'
+  warlord_win: 'warlord', warlord_loss: 'warlord', warlord_territory: 'warlord',
+  evolution_dna: 'evolution',
+  flood_room: 'flood',
+  hoops_basket: 'hoops',
+  burger_order: 'burger',
+  tag_win: 'tag', tag_loss: 'tag',
+  robot_win: 'robot'
 };
 
 const GAME_DISPLAY_NAMES = {
@@ -542,7 +581,9 @@ const GAME_DISPLAY_NAMES = {
   golf: 'Cosmic Golf', sumo: 'Sumo Duel',
   towerdefense: 'Tower Defense', parkour: 'Ninja Parkour', zombie: 'Zombie Survival',
   pirate: 'Pirate Adventure', samurai: 'Samurai Showdown', policechase: 'Police Chase',
-  tactics: 'Tactics Grid', runeduel: 'Rune Duel', warlord: 'Warlord'
+  tactics: 'Tactics Grid', runeduel: 'Rune Duel', warlord: 'Warlord',
+  evolution: 'Evolution', flood: 'Flood Escape', hoops: 'Buzzer Beater',
+  burger: 'Burger Rush', tag: 'Neon Tag', robot: 'Robot Arena'
 };
 
 const DEFAULT_WALLET = { tokens: 0, owned: ['neon'], equipped: 'neon', companion: null, asteroidUpgrades: { extraLife: 0, turnSpeed: 0, autoTurret: 0 }, wildduelUpgrades: { extraHp: 0, fasterReload: 0, fasterMovement: 0 }, roguelikeUpgrades: { extraHp: 0, swordDamage: 0, magicPower: 0, swiftBoots: 0 }, achievements: [], stats: { bricksBroken: 0, racesFinished: 0, winStreak: 0, bestWinStreak: 0, tokensEarnedLifetime: 0, secondsPlayed: 0, maxTokensHeld: 0, crateOpens: 0, legendaryCratePulls: 0 }, titles: [], borders: [], seasonBadges: [], xp: 0, level: 1, avatar: '🙂', banner: 'default', friends: [], pendingGifts: [], animatedName: false, createdAt: null, gamePlays: {}, unlockedAvatars: [], unlockedBanners: [], prestige: 0, prestigeBadgeColor: null, daily: null, dailyStreak: 0, dailyBestStreak: 0, dailyLastPerfectDate: null, lastSpinDate: null };
@@ -1449,7 +1490,8 @@ const PARTY_GAMES = [
   'soccer', 'racing', 'tank', 'runner', 'wildduel', 'asteroid', 'breaker',
   'roguelike', 'comet', 'tunnel', 'depths', 'stack', 'golf', 'sumo',
   'towerdefense', 'parkour', 'zombie', 'pirate', 'samurai', 'policechase',
-  'tactics', 'runeduel', 'warlord'
+  'tactics', 'runeduel', 'warlord',
+  'evolution', 'flood', 'hoops', 'burger', 'tag', 'robot'
 ];
 const partyRooms = new Map(); // code -> room
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000; // rooms auto-expire after 3h idle

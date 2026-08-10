@@ -106,7 +106,13 @@ const CABINET_KEYWORDS = {
   policechase:'racing driving car chase pursuit',
   tactics:'strategy turn-based tactics grid war',
   runeduel:'card strategy magic duel versus',
-  warlord:'strategy war army command battle'
+  warlord:'strategy war army command battle',
+  evolution:'survival arcade growth eating creature nature',
+  flood:'platformer survival water escape climbing',
+  hoops:'sports basketball shooting arcade aiming',
+  burger:'cooking arcade time management food',
+  tag:'party versus chase running arena',
+  robot:'fighting versus mech arena building shooter'
 };
 
 let cabinetSearch = '';

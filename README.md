@@ -126,7 +126,7 @@ public/
                           settings, sprites, mini3d, pause, init
     features/             chat, shop, achievements, daily, community,
                           profile, crates, party, builder, admin, ...
-    games/                one file per cabinet (23 of them)
+    games/                one file per cabinet (29 of them)
 ```
 
 The scripts are plain (non-module) files loaded in order, exactly as they ran
@@ -141,7 +141,7 @@ in `server.js` and add a row to `LB_BOARDS` for the leaderboard.
 
 ## The cabinets
 
-Fourteen playable cabinets, all in the one HTML file:
+Twenty-nine playable cabinets, one JS file each under `public/js/games/`:
 
 | Cabinet | Type | Tracks |
 | --- | --- | --- |
@@ -159,12 +159,30 @@ Fourteen playable cabinets, all in the one HTML file:
 | 🏗 Sky Stack | Solo · **3D** | Best height |
 | 🪐 Gravity Golf | Solo | Holes sunk |
 | 🥏 Neon Sumo | 1v1 (bot or local) | Wins |
+| 🏰 Tower Defense | Solo · strategy | Best wave |
+| 🥷 Ninja Parkour | Solo | Best time |
+| 🧟 Zombie Survival | Solo | Best wave |
+| 🏴‍☠️ Pirate Adventure | Solo | Treasure |
+| 🗡️ Samurai Showdown | 1v1 (bot or local) | Wins |
+| 🚓 Police Chase | Solo | High score |
+| ♟️ Tactics Grid | 1v1 · strategy | Wins |
+| 🔮 Rune Duel | 1v1 · strategy | Wins |
+| 🗺️ Warlord | 1v1 · strategy | Wins |
+| 🧬 Evolution | Solo | Best stage |
+| 🌊 Flood Escape | Solo | Rooms escaped |
+| 🏀 Buzzer Beater | Solo | High score |
+| 🍔 Burger Rush | Solo | Orders served |
+| 🏃 Neon Tag | 1v1 (bot or local) | Wins |
+| 🤖 Robot Arena | Solo | Best round |
 
 The dashboard grid is generated from the `CABINETS` array in the page, so
 adding a cabinet is one entry in that list plus the game module itself — the
 filter chips, the tags and the "your best" line on each card all follow from
 it. Wire the new stat into `DEFAULT_STATS` in `server.js` and add a row to
-`LB_BOARDS` in the page and it shows up on the Leaderboard too.
+`LB_BOARDS` in `js/features/upgrades.js` and it shows up on the Leaderboard
+too. Don't forget `stopAllGames()` in `js/core/screens.js` and
+`currentGameModule()` in `js/core/pause.js` — a cabinet missing from either
+starts fine but can't be paused and never receives key presses.
 
 ### The 3D cabinets
 

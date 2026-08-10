@@ -1705,6 +1705,246 @@
   </div>
 </div>
 
+
+<!-- ============ EVOLUTION SCREEN ============ -->
+<div id="evolution-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🧬 EVOLUTION</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="setup-panel" id="evolution-setup">
+    <div class="controls-box">
+      <b>WASD / arrows</b> to swim.<br>
+      Eat <b>DNA</b> to grow. Anything <b>smaller</b> than you is food; anything <b>bigger</b> eats you.
+      Every evolution offers a trait — speed, appetite, a carapace or cilia — and the run is shaped by which you take.
+    </div>
+    <button class="btn btn-primary" onclick="EvolutionGame.start()">Begin as a Speck</button>
+  </div>
+  <div class="play-area hidden" id="evolution-play">
+    <div class="hud">
+      <span class="hud-chip">STAGE <b id="evolution-stage">Microbe</b></span>
+      <span class="hud-score" id="evolution-dna">0</span>
+      <span class="hud-chip" id="evolution-next">—</span>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="evolution-canvas" width="760" height="480"></canvas>
+      <div id="evolution-choice" class="hidden"></div>
+    </div>
+  </div>
+  <div class="result-overlay hidden" id="evolution-result">
+    <h3 id="evolution-result-text">CONSUMED</h3>
+    <p id="evolution-result-sub"></p>
+    <button class="btn btn-pink" onclick="EvolutionGame.reset()">Evolve Again</button>
+  </div>
+</div>
+
+<!-- ============ FLOOD ESCAPE SCREEN ============ -->
+<div id="flood-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🌊 FLOOD ESCAPE</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="setup-panel" id="flood-setup">
+    <div class="controls-box">
+      <b>A/D</b> move &middot; <b>W / SPACE</b> jump.<br>
+      The water never stops rising. Hit <b>every switch</b> to unlock the exit, then reach the door before you're under.
+      Each room you clear is taller and floods faster.
+    </div>
+    <button class="btn btn-primary" onclick="FloodGame.start()">Enter the Facility</button>
+  </div>
+  <div class="play-area hidden" id="flood-play">
+    <div class="hud">
+      <span class="hud-chip">ROOM <b id="flood-room">1</b></span>
+      <span class="hud-score" id="flood-switches">0 / 0</span>
+      <span class="hud-chip">DEPTH <b id="flood-water">0m</b></span>
+    </div>
+    <canvas id="flood-canvas" width="760" height="500"></canvas>
+  </div>
+  <div class="result-overlay hidden" id="flood-result">
+    <h3 id="flood-result-text">THE WATER WON</h3>
+    <p id="flood-result-sub"></p>
+    <button class="btn btn-pink" onclick="FloodGame.reset()">Try Again</button>
+  </div>
+</div>
+
+<!-- ============ BASKETBALL HOOPS SCREEN ============ -->
+<div id="hoops-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🏀 BASKETBALL HOOPS</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="setup-panel" id="hoops-setup">
+    <div class="controls-box">
+      <b>↑/↓</b> aim &middot; <b>SPACE</b> shoot. The power meter swings on its own — shoot on the value you want.<br>
+      Ninety seconds. Consecutive baskets build a multiplier; a miss resets it. After three baskets the hoop starts moving.
+    </div>
+    <button class="btn btn-primary" onclick="HoopsGame.start()">Tip Off</button>
+  </div>
+  <div class="play-area hidden" id="hoops-play">
+    <div class="hud">
+      <div class="hud-stack">
+        <span class="hud-chip">COMBO <b id="hoops-combo">×1</b></span>
+        <span class="hud-chip">ACC <b id="hoops-acc">0%</b></span>
+      </div>
+      <span class="hud-score" id="hoops-score">0</span>
+      <span class="hud-chip">TIME <b id="hoops-time">90s</b></span>
+    </div>
+    <canvas id="hoops-canvas" width="760" height="470"></canvas>
+  </div>
+  <div class="result-overlay hidden" id="hoops-result">
+    <h3 id="hoops-result-text">FULL TIME</h3>
+    <p id="hoops-result-sub"></p>
+    <button class="btn btn-pink" onclick="HoopsGame.reset()">Shoot Again</button>
+  </div>
+</div>
+
+<!-- ============ BURGER RUSH SCREEN ============ -->
+<div id="burger-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🍔 BURGER RUSH</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="setup-panel" id="burger-setup">
+    <div class="controls-box">
+      <b>1–6</b> add an ingredient &middot; <b>X</b> undo &middot; <b>ENTER</b> serve.<br>
+      Build each order <b>bottom-up in the right order</b>. Serve before the customer's patience runs out.
+      A wrong plate only costs your combo &mdash; but it makes everyone in the queue impatient.
+      Three walkouts and the kitchen closes.
+    </div>
+    <button class="btn btn-primary" onclick="BurgerGame.start()">Open the Kitchen</button>
+  </div>
+  <div class="play-area hidden" id="burger-play">
+    <div class="hud">
+      <span class="hud-chip">COMBO <b id="burger-combo">×1</b></span>
+      <span class="hud-score" id="burger-served">0</span>
+      <span class="hud-chip" id="burger-lives">❤❤❤</span>
+    </div>
+    <canvas id="burger-canvas" width="760" height="500"></canvas>
+  </div>
+  <div class="result-overlay hidden" id="burger-result">
+    <h3 id="burger-result-text">KITCHEN CLOSED</h3>
+    <p id="burger-result-sub"></p>
+    <button class="btn btn-pink" onclick="BurgerGame.reset()">Reopen</button>
+  </div>
+</div>
+
+<!-- ============ TAG ARENA SCREEN ============ -->
+<div id="tag-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🏃 TAG ARENA</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="setup-panel" id="tag-setup">
+    <div class="setup-section-label">Mode</div>
+    <div class="option-row">
+      <button class="option-btn" id="tag-mode-single" onclick="TagGame.setMode('single')">Single Player</button>
+      <button class="option-btn" id="tag-mode-multi" onclick="TagGame.setMode('multi')">Local Multiplayer</button>
+    </div>
+    <div id="tag-diff-section">
+      <div class="setup-section-label">Bot Difficulty</div>
+      <div class="option-row">
+        <button class="option-btn" id="tag-diff-easy" onclick="TagGame.setDifficulty('easy')">Easy</button>
+        <button class="option-btn" id="tag-diff-medium" onclick="TagGame.setDifficulty('medium')">Medium</button>
+        <button class="option-btn" id="tag-diff-hard" onclick="TagGame.setDifficulty('hard')">Hard</button>
+      </div>
+    </div>
+    <div class="controls-box">
+      <b class="p1c">PLAYER 1</b> &mdash; WASD move &middot; <b>SPACE</b> dash<br>
+      <b class="p2c">PLAYER 2</b> &mdash; arrows move &middot; <b>ENTER</b> dash<br>
+      One of you is <b>"it"</b>. Touch the other to pass it on. Being "it" is slightly faster — but whoever spends
+      the <b>least</b> total time as "it" wins the round. Dashing costs stamina; green pads refill it.
+    </div>
+    <button class="btn btn-primary" onclick="TagGame.start()">Start Round</button>
+  </div>
+  <div class="play-area hidden" id="tag-play">
+    <div class="hud">
+      <div class="hud-stack">
+        <span>P1 <b id="tag-p1-time">0s</b></span>
+        <div class="meter"><i id="tag-p1-stam"></i></div>
+      </div>
+      <span class="hud-score" id="tag-time">60s</span>
+      <div class="hud-stack">
+        <div class="meter meter-hp"><i id="tag-p2-stam"></i></div>
+        <span id="tag-p2-label">BOT</span> <b id="tag-p2-time">0s</b>
+      </div>
+    </div>
+    <canvas id="tag-canvas" width="760" height="480"></canvas>
+  </div>
+  <div class="result-overlay hidden" id="tag-result">
+    <h3 id="tag-result-text">RESULT</h3>
+    <p id="tag-result-sub"></p>
+    <button class="btn btn-pink" onclick="TagGame.reset()">Rematch</button>
+  </div>
+</div>
+
+<!-- ============ ROBOT ARENA SCREEN ============ -->
+<div id="robot-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🤖 ROBOT ARENA</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="setup-panel" id="robot-setup">
+    <div class="setup-section-label">Chassis</div>
+    <div class="option-row">
+      <button class="option-btn" id="robot-chassis-light" onclick="RobotGame.setPart('chassis','light')">Light</button>
+      <button class="option-btn selected" id="robot-chassis-medium" onclick="RobotGame.setPart('chassis','medium')">Medium</button>
+      <button class="option-btn" id="robot-chassis-heavy" onclick="RobotGame.setPart('chassis','heavy')">Heavy</button>
+    </div>
+    <div class="setup-section-label">Weapon</div>
+    <div class="option-row">
+      <button class="option-btn selected" id="robot-weapon-laser" onclick="RobotGame.setPart('weapon','laser')">Laser</button>
+      <button class="option-btn" id="robot-weapon-cannon" onclick="RobotGame.setPart('weapon','cannon')">Cannon</button>
+      <button class="option-btn" id="robot-weapon-shotgun" onclick="RobotGame.setPart('weapon','shotgun')">Scatter</button>
+    </div>
+    <div class="setup-section-label">Core</div>
+    <div class="option-row">
+      <button class="option-btn selected" id="robot-core-power" onclick="RobotGame.setPart('core','power')">Power</button>
+      <button class="option-btn" id="robot-core-guard" onclick="RobotGame.setPart('core','guard')">Guard</button>
+      <button class="option-btn" id="robot-core-turbo" onclick="RobotGame.setPart('core','turbo')">Turbo</button>
+    </div>
+    <div class="setup-section-label">Opponent Skill</div>
+    <div class="option-row">
+      <button class="option-btn selected" id="robot-diff-easy" onclick="RobotGame.setDifficulty('easy')">Easy</button>
+      <button class="option-btn" id="robot-diff-medium" onclick="RobotGame.setDifficulty('medium')">Medium</button>
+      <button class="option-btn" id="robot-diff-hard" onclick="RobotGame.setDifficulty('hard')">Hard</button>
+    </div>
+    <div class="shop-balance-row"><span>YOUR BUILD</span></div>
+    <div id="robot-preview" style="font-family:var(--font-mono); margin-bottom:16px;"></div>
+    <div class="controls-box">
+      <b>W/S</b> drive &middot; <b>A/D</b> turn &middot; <b>SPACE</b> fire.<br>
+      The dashed line is your barrel &mdash; it turns green and rings the target when you're
+      lined up. Beat a robot and a tougher one rolls in; damage carries between rounds, and
+      a win patches you up by a quarter of your hull.
+    </div>
+    <button class="btn btn-primary" onclick="RobotGame.start()">Enter the Arena</button>
+  </div>
+  <div class="play-area hidden" id="robot-play">
+    <div class="hud">
+      <div class="hud-stack">
+        <span>YOU</span>
+        <div class="meter"><i id="robot-hp"></i></div>
+      </div>
+      <span class="hud-score">ROUND <span id="robot-round">1</span></span>
+      <div class="hud-stack">
+        <div class="meter meter-hp"><i id="robot-foe-hp"></i></div>
+        <span id="robot-foe-build" style="font-size:10px;"></span>
+      </div>
+    </div>
+    <canvas id="robot-canvas" width="760" height="480"></canvas>
+  </div>
+  <div class="result-overlay hidden" id="robot-result">
+    <h3 id="robot-result-text">DESTROYED</h3>
+    <p id="robot-result-sub"></p>
+    <button class="btn btn-pink" onclick="RobotGame.reset()">Rebuild</button>
+  </div>
+</div>
+
 <!-- ============ PAUSE OVERLAY (shared across all games) ============ -->
 <div id="pause-overlay" class="modal-overlay hidden">
   <div class="modal-card" style="text-align:center;">
@@ -1848,6 +2088,12 @@
 <script src="js/games/runeduel.js"></script>
 <script src="js/games/warlord.js"></script>
 <script src="js/features/admin.js"></script>
+<script src="js/games/evolution.js"></script>
+<script src="js/games/flood.js"></script>
+<script src="js/games/hoops.js"></script>
+<script src="js/games/burger.js"></script>
+<script src="js/games/tag.js"></script>
+<script src="js/games/robot.js"></script>
 <script src="js/features/qol.js"></script>
 <script src="js/features/results.js"></script>
 <script src="js/features/shopplus.js"></script>
