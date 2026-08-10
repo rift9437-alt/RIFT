@@ -200,6 +200,22 @@ Three of them are actually 3D, with no libraries and no WebGL:
 Both approaches share the arcade's flat-neon look and stay comfortably at
 60fps on a normal laptop.
 
+## The Gazette and the Archive
+
+One screen, two halves.
+
+The **Gazette** is a front page written from whatever actually happened in
+the arcade: the board with the widest gap between first and second, whoever
+has been on the machines longest, the newest clan, who's sitting on the most
+tokens, how many bug reports are open. Every story is generated from live
+records on request, so it can't go stale; cached for 30 seconds.
+
+The **Archive** is the building's backstory, released a fragment at a time.
+Each entry unlocks on something you actually did, and they unlock *in order* —
+a sealed entry shows only the hint for what opens it and never ships its text
+to the client, so the archive reads as a straight story and doubles as a list
+of things to go and try.
+
 ## Rotating shop
 
 Above the main catalog the shop runs three rotating slots:

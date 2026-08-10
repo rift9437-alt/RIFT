@@ -1980,6 +1980,195 @@ async function globalStats(){
   return value;
 }
 
+// ---------------------------------------------------------------------------
+// Lore — the Level 7 archive
+// ---------------------------------------------------------------------------
+// Fragments of the arcade's backstory, each unlocked by something you
+// actually did. They're ordered, and each one points at what unlocks the
+// next, so reading the archive doubles as a trail of things to go and try.
+const LORE = [
+  { id: 'l1', title: 'The Lease',
+    body: "Level 7 was the seventh floor of a building that only had six. The lease was signed anyway. The landlord never came back for the paperwork, and by the time anyone checked, the stairwell had one more landing than the blueprints allowed.",
+    hint: 'Play anything. The floor notices.',
+    test: w => (w.stats?.secondsPlayed || 0) > 0 || Object.keys(w.gamePlays || {}).length > 0 },
+
+  { id: 'l2', title: 'First Keyholder',
+    body: "Ten keys were cut. Nobody remembers who cut them. Each one opens the same door, and the door has never once been locked — which is either a joke at the keyholders' expense, or the whole point.",
+    hint: 'Win a game. Any game.',
+    test: (w, totals) => totals.wins >= 1 },
+
+  { id: 'l3', title: 'The Token Press',
+    body: "The tokens aren't currency anywhere else. They were struck in the basement on a machine that predates the arcade, out of an alloy the smelter's records list only as 'floor-stock'. They are always warm.",
+    hint: 'Earn 1,000 tokens across your lifetime.',
+    test: w => (w.stats?.tokensEarnedLifetime || 0) >= 1000 },
+
+  { id: 'l4', title: 'Cabinet Thirteen',
+    body: "There is no cabinet thirteen. There is a gap in the numbering where it should be, and the power draw on that circuit is measurably higher than the empty space accounts for. Management has been asked. Management has not answered.",
+    hint: 'Play ten different cabinets.',
+    test: w => Object.keys(w.gamePlays || {}).length >= 10 },
+
+  { id: 'l5', title: 'The Long Game',
+    body: "One keyholder is said to have played for eleven hours straight without touching the exit. When they finally stood up, the high score table had their initials on every row, and none of the rest of us had put a coin in.",
+    hint: 'Spend an hour on the machines.',
+    test: w => (w.stats?.secondsPlayed || 0) >= 3600 },
+
+  { id: 'l6', title: 'What the Crates Are For',
+    body: "The crates arrive already sealed. Nobody delivers them. Opening one has never yielded anything the arcade didn't already contain — which raises the question of why anyone bothered to seal them.",
+    hint: 'Open five loot crates.',
+    test: w => (w.stats?.crateOpens || 0) >= 5 },
+
+  { id: 'l7', title: 'The Seventh Secret',
+    body: "Every secret in this building is a door. Every door leads back into the same room. The keyholders who found the most of them describe the feeling not as discovery but as recognition — as though the arcade had been waiting for them to catch up.",
+    hint: 'Find three secrets.',
+    test: w => (w.secretsFound || 0) >= 3 },
+
+  { id: 'l8', title: 'Closing Time',
+    body: "There is no closing time. The sign says there is. The sign has said so since before any of us had keys, and the lights have never once gone out. Whatever the seventh floor is for, it is not for leaving.",
+    hint: 'Reach level 10.',
+    test: w => (w.level || 1) >= 10 }
+];
+
+function loreFor(user, data){
+  const w = (data[user] && data[user].wallet) || {};
+  const totals = {
+    wins: Object.keys(DEFAULT_STATS).reduce((sum, g) =>
+      sum + ((data[user] && data[user][g] && typeof data[user][g].wins === 'number') ? data[user][g].wins : 0), 0)
+  };
+  // Entries unlock in order — a later fragment stays sealed until the ones
+  // before it are read, so the archive always tells the story straight.
+  let chainBroken = false;
+  return LORE.map(entry => {
+    const met = !chainBroken && !!entry.test(w, totals);
+    if (!met) chainBroken = true;
+    return met
+      ? { id: entry.id, title: entry.title, body: entry.body, unlocked: true }
+      : { id: entry.id, title: '???', body: null, hint: entry.hint, unlocked: false };
+  });
+}
+
+app.get('/api/lore', async (req, res) => {
+  const user = authenticate(req);
+  try {
+    const data = await loadData();
+    const entries = user ? loreFor(user, data) : LORE.map(e => ({ id: e.id, title: '???', unlocked: false, hint: 'Sign in to read the archive.' }));
+    res.json({ entries, total: LORE.length, unlocked: entries.filter(e => e.unlocked).length });
+  } catch (e) {
+    console.error('Lore fetch failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The Level 7 Gazette
+// ---------------------------------------------------------------------------
+// A front page written from whatever actually happened in the arcade —
+// record holders, the newest clan, who's been grinding. Derived on request
+// so it's never stale, cached briefly because it reads every record.
+let gazetteCache = { at: 0, value: null };
+const GAZETTE_TTL_MS = 30000;
+
+async function buildGazette(){
+  if (gazetteCache.value && Date.now() - gazetteCache.at < GAZETTE_TTL_MS) return gazetteCache.value;
+  const data = await loadData();
+  const stories = [];
+
+  // Lead story: the board with the biggest gap between first and second.
+  let lead = null;
+  Object.keys(DEFAULT_STATS).forEach(game => {
+    const key = Object.keys(DEFAULT_STATS[game])[0];
+    if (!key) return;
+    const ranked = USERS
+      .map(u => ({ user: u, value: ((data[u] && data[u][game]) || {})[key] || 0 }))
+      .sort((a, b) => b.value - a.value);
+    if (!ranked[0] || !ranked[0].value) return;
+    const gap = ranked[0].value - (ranked[1] ? ranked[1].value : 0);
+    if (!lead || gap > lead.gap) {
+      // A runner-up on zero hasn't actually played, so don't frame their
+      // absence as a "cushion" the size of the whole score.
+      const contender = ranked[1] && ranked[1].value > 0 ? ranked[1] : null;
+      lead = { game, key, gap, holder: ranked[0].user, value: ranked[0].value,
+               runnerUp: contender ? contender.user : null };
+    }
+  });
+  if (lead) {
+    const num = n => n.toLocaleString('en-US');
+    stories.push({
+      kind: 'lead',
+      headline: `${lead.holder} RUNS AWAY WITH ${(GAME_DISPLAY_NAMES[lead.game] || lead.game).toUpperCase()}`,
+      body: lead.runnerUp
+        ? `${num(lead.value)} on the board and a ${num(lead.gap)}-point cushion over ${lead.runnerUp}. Nobody has come close since.`
+        : `${num(lead.value)} on the board, and not one other keyholder has posted a score.`
+    });
+  }
+
+  // Grinder of the moment.
+  const busiest = USERS
+    .map(u => ({ user: u, secs: ((data[u] && data[u].wallet && data[u].wallet.stats) || {}).secondsPlayed || 0 }))
+    .sort((a, b) => b.secs - a.secs)[0];
+  if (busiest && busiest.secs > 0) {
+    const mins = Math.round(busiest.secs / 60);
+    stories.push({
+      kind: 'story',
+      headline: `${busiest.user} HAS NOT LEFT THE BUILDING`,
+      body: `${mins} minute${mins === 1 ? '' : 's'} on the machines and counting. Someone check on them.`
+    });
+  }
+
+  // Newest clan.
+  try {
+    const { rows } = await pool.query(
+      'SELECT tag, name, owner, motto FROM clans ORDER BY created_at DESC LIMIT 1');
+    if (rows.length) {
+      stories.push({
+        kind: 'story',
+        headline: `[${rows[0].tag}] ${rows[0].name.toUpperCase()} OPENS ITS DOORS`,
+        body: `Founded by ${rows[0].owner}.` + (rows[0].motto ? ` Their words, not ours: “${rows[0].motto}”.` : '')
+      });
+    }
+  } catch (e) {
+    console.error('Gazette clan story failed:', e);
+  }
+
+  // Richest keyholder.
+  const richest = USERS
+    .map(u => ({ user: u, tokens: ((data[u] && data[u].wallet) || {}).tokens || 0 }))
+    .sort((a, b) => b.tokens - a.tokens)[0];
+  if (richest && richest.tokens > 0) {
+    stories.push({
+      kind: 'brief',
+      headline: 'TOKEN WATCH',
+      body: `${richest.user} is sitting on ${richest.tokens.toLocaleString('en-US')} tokens. The press in the basement keeps running regardless.`
+    });
+  }
+
+  // Open bug reports, so players can see their reports landed somewhere.
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*)::int AS n FROM bug_reports WHERE status = 'open'");
+    if (rows[0].n > 0) {
+      stories.push({
+        kind: 'brief',
+        headline: 'MAINTENANCE LOG',
+        body: `${rows[0].n} report${rows[0].n === 1 ? '' : 's'} open on the workshop bench. Management is aware. Management is always aware.`
+      });
+    }
+  } catch (e) {
+    console.error('Gazette bug story failed:', e);
+  }
+
+  const value = { issued: new Date().toISOString(), stories };
+  gazetteCache = { at: Date.now(), value };
+  return value;
+}
+
+app.get('/api/gazette', async (req, res) => {
+  try {
+    res.json(await buildGazette());
+  } catch (e) {
+    console.error('Gazette failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
 app.get('/api/global-stats', async (req, res) => {
   try {
     res.json(await globalStats());
