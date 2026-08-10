@@ -1407,6 +1407,9 @@ function withWriteLock(fn) {
   return result;
 }
 
+const http = require('http');
+const { WebSocketServer } = require('ws');
+
 const app = express();
 app.use(express.json());
 
@@ -1462,15 +1465,30 @@ app.post('/api/login', async (req, res) => {
   res.json({ token, username });
 });
 
-// Serve the game itself from this same server, so "npm start" + one URL
-// is all you need — no separate static host, no editing LB_API_BASE.
-// Only the public/ directory is exposed, so server.js, package.json and any
-// local data files stay unreachable no matter what path is requested.
+// Where the playable site actually lives. In production that's GitHub Pages;
+// this server is API + realtime only, and bounces anyone who lands on it to
+// the real front end. Override with SITE_ORIGIN if the Pages URL changes.
+const SITE_ORIGIN = (process.env.SITE_ORIGIN || 'https://rift9437-alt.github.io/RIFT')
+  .replace(/\/+$/, '');
+
+// For local development, `SERVE_STATIC=1 npm start` puts the front end back on
+// this server so "npm start" + one URL is still all you need. Only public/ is
+// exposed, so server.js, package.json and any local data files stay
+// unreachable no matter what path is requested.
 const PUBLIC_DIR = path.join(__dirname, 'public');
-app.use(express.static(PUBLIC_DIR, { index: false, maxAge: '1h' }));
-app.get('/', (req, res) => {
-  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
-});
+const SERVE_STATIC = process.env.SERVE_STATIC === '1';
+
+if (SERVE_STATIC) {
+  app.use(express.static(PUBLIC_DIR, { index: false, maxAge: '1h' }));
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+  });
+} else {
+  // Anything that isn't the API, the socket, or a health check is a person who
+  // typed the backend URL by mistake — send them to the site. Registered last
+  // (see the bottom of this file) so it can't shadow a real route.
+  app.get('/healthz', (req, res) => res.json({ ok: true, site: SITE_ORIGIN }));
+}
 
 app.get('/api/leaderboard', async (req, res) => {
   res.json(await loadData());
@@ -1530,6 +1548,10 @@ app.post('/api/leaderboard/update', async (req, res) => {
       return data;
     });
 
+    // Push a patch, not the whole table. The full standings are ~15KB and a
+    // score lands every few seconds across the arcade; one user's changed
+    // game is all anyone needs to update their copy.
+    broadcastEvent('scores', { user, game, stats: updated[user][game] });
     res.json(updated);
   } catch (e) {
     console.error('Update failed:', e);
@@ -1832,10 +1854,10 @@ app.post('/api/chat', async (req, res) => {
         [CHAT_KEEP_ROWS]
       ).catch(() => {});
     }
+    const posted = chatRowToMessage(inserted.rows[0]);
+    broadcastEvent('chat', { message: posted });
     const from = Math.max(0, parseInt(since, 10) || 0);
-    const messages = from > 0
-      ? await loadChatSince(from)
-      : [chatRowToMessage(inserted.rows[0])];
+    const messages = from > 0 ? await loadChatSince(from) : [posted];
     res.json({ messages });
   } catch (e) {
     console.error('Chat post failed:', e);
@@ -3838,7 +3860,9 @@ app.post('/api/admin/broadcast', async (req, res) => {
   try {
     await saveBroadcast(content);
     logAdminAction('broadcast', { contentLength: content.length, cleared: content.length === 0 });
-    res.json(await loadBroadcast());
+    const current = await loadBroadcast();
+    broadcastEvent('broadcast', current);
+    res.json(current);
   } catch (e) {
     console.error('Admin broadcast failed:', e);
     res.status(500).json({ error: 'Internal error' });
@@ -4333,10 +4357,151 @@ app.post('/api/admin/bugs', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Realtime (WebSocket)
+// ---------------------------------------------------------------------------
+// One socket per logged-in tab. The client authenticates with the same bearer
+// token it uses for the REST API — the socket grants no authority the token
+// didn't already have, and it is push-only: every state change still goes
+// through a POST that validates it. Losing the socket costs you liveness,
+// never correctness, because the HTTP pollers stay as the fallback.
+const wss = new WebSocketServer({ noServer: true });
+const liveSockets = new Set();
+
+const WS_AUTH_GRACE_MS = 10000;   // authenticate this fast or you're dropped
+const WS_HEARTBEAT_MS = 30000;    // ping cadence; two misses and you're gone
+
+function wsSend(ws, type, payload){
+  if (ws.readyState !== ws.OPEN) return;
+  try {
+    ws.send(JSON.stringify({ type, payload, at: Date.now() }));
+  } catch (e) {
+    console.error('WS send failed:', e);
+  }
+}
+
+// Push an event to every authenticated socket. `filter` narrows it to
+// specific users (e.g. a gift only its recipient should hear about).
+function broadcastEvent(type, payload, filter){
+  for (const ws of liveSockets) {
+    if (!ws.username) continue;
+    if (filter && !filter(ws.username)) continue;
+    wsSend(ws, type, payload);
+  }
+}
+
+function onlineUsers(){
+  return [...new Set([...liveSockets].map(ws => ws.username).filter(Boolean))].sort();
+}
+
+let presenceDirty = false;
+function announcePresence(){
+  // Coalesce bursts (a reload is a disconnect plus a connect) into one push.
+  if (presenceDirty) return;
+  presenceDirty = true;
+  setTimeout(() => {
+    presenceDirty = false;
+    broadcastEvent('presence', { online: onlineUsers() });
+  }, 250);
+}
+
+wss.on('connection', ws => {
+  liveSockets.add(ws);
+  ws.isAlive = true;
+  ws.username = null;
+  ws.on('pong', () => { ws.isAlive = true; });
+
+  // A socket that never authenticates is just holding a slot.
+  const authTimer = setTimeout(() => {
+    if (!ws.username) ws.close(4001, 'Authentication timeout');
+  }, WS_AUTH_GRACE_MS);
+
+  ws.on('message', raw => {
+    let msg;
+    try {
+      msg = JSON.parse(String(raw).slice(0, 4096));
+    } catch (e) {
+      return; // ignore anything that isn't small, well-formed JSON
+    }
+    if (msg.type === 'auth') {
+      const session = sessions.get(msg.token);
+      if (!session || session.expiresAt < Date.now()) {
+        wsSend(ws, 'auth', { ok: false, error: 'Session expired' });
+        ws.close(4003, 'Bad token');
+        return;
+      }
+      clearTimeout(authTimer);
+      ws.username = session.username;
+      wsSend(ws, 'auth', { ok: true, user: ws.username, online: onlineUsers() });
+      announcePresence();
+      return;
+    }
+    if (msg.type === 'ping') wsSend(ws, 'pong', {});
+  });
+
+  ws.on('close', () => {
+    clearTimeout(authTimer);
+    liveSockets.delete(ws);
+    announcePresence();
+  });
+  ws.on('error', () => {
+    clearTimeout(authTimer);
+    liveSockets.delete(ws);
+  });
+});
+
+// Render's proxy will happily hold a half-dead socket open; the ping/pong
+// sweep is what actually reaps them.
+const wsHeartbeat = setInterval(() => {
+  for (const ws of liveSockets) {
+    if (ws.isAlive === false) { ws.terminate(); liveSockets.delete(ws); continue; }
+    ws.isAlive = false;
+    try { ws.ping(); } catch (e) { ws.terminate(); liveSockets.delete(ws); }
+  }
+}, WS_HEARTBEAT_MS);
+wsHeartbeat.unref();
+
+// Registered last so it can never shadow a real route: anything that isn't the
+// API or a health check is a person who typed the backend URL, so send them to
+// the site. An unknown /api/* path stays a JSON 404 — redirecting an API call
+// to an HTML page would turn a clear error into a confusing parse failure.
+if (!SERVE_STATIC) {
+  app.use((req, res) => {
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'Unknown endpoint' });
+    }
+    const suffix = req.originalUrl === '/' ? '' : req.originalUrl;
+    res.redirect(302, SITE_ORIGIN + suffix);
+  });
+}
+
+const server = http.createServer(app);
+
+// Only upgrade on /ws — anything else asking to upgrade gets hung up on
+// rather than left hanging.
+server.on('upgrade', (req, socket, head) => {
+  let pathname;
+  try {
+    pathname = new URL(req.url, 'http://localhost').pathname;
+  } catch (e) {
+    socket.destroy();
+    return;
+  }
+  if (pathname !== '/ws') {
+    socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+  wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+});
+
 initDb()
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Leaderboard server running on http://localhost:${PORT}`);
+    server.listen(PORT, () => {
+      console.log(`Level 7 API running on http://localhost:${PORT}`);
+      console.log(SERVE_STATIC
+        ? '  serving the front end from public/'
+        : `  front end expected at ${SITE_ORIGIN}`);
     });
   })
   .catch(e => {

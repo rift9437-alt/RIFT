@@ -235,7 +235,10 @@ let lbPollTimer = null;
 function startLeaderboardPolling(){
   stopLeaderboardPolling();
   lbPollTimer = setInterval(()=>{
-    if(currentScreen === 'leaderboard-screen') renderLeaderboard();
+    if(currentScreen !== 'leaderboard-screen') return;
+    // Score changes arrive over the socket; this is the fallback.
+    if(typeof Realtime !== 'undefined' && Realtime.isLive()) return;
+    renderLeaderboard();
   }, LB_POLL_MS);
 }
 function stopLeaderboardPolling(){

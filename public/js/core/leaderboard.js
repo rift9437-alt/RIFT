@@ -3,7 +3,7 @@
    ========================================================= */
 // Point this at wherever you deploy leaderboard-server/. If the game page
 // and the API are served from the same origin, '/api' is fine as-is.
-const LB_API_BASE = '/api';
+// LB_API_BASE and WS_URL live in core/config.js, which loads first.
 
 function freshUserRecord(){
   return {

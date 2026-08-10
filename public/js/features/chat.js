@@ -90,6 +90,33 @@ function renderChat(){
   if(nearBottom || chatMessages.length <= 12) log.scrollTop = log.scrollHeight;
 }
 
+// Shared by the poller and the socket, so a message takes the same path —
+// dedupe, buffer trim, unread badge, sound — whichever way it arrived.
+function ingestChatMessages(incoming, force){
+  if(!Array.isArray(incoming) || !incoming.length){
+    if(force) renderChat();
+    return;
+  }
+  // The socket can race the poll and deliver the same message twice.
+  const fresh = incoming.filter(m => m.id > chatLastId);
+  if(!fresh.length){
+    if(force) renderChat();
+    return;
+  }
+  const fromOthers = fresh.filter(m => m.user !== currentUser).length;
+  chatMessages = chatMessages.concat(fresh);
+  // Keep the client-side buffer bounded; the server keeps the archive.
+  if(chatMessages.length > 200) chatMessages = chatMessages.slice(-200);
+  chatLastId = fresh[fresh.length-1].id;
+  if(chatOpen){
+    renderChat();
+  } else if(fromOthers > 0){
+    chatUnread += fromOthers;
+    updateChatBadge();
+  }
+  if(fromOthers > 0 && !force) Sfx.play('coin', 1.25);
+}
+
 async function refreshChat(force){
   if(!currentUser) return;
   try{
@@ -97,24 +124,11 @@ async function refreshChat(force){
     if(!res.ok) throw new Error('bad response');
     const data = await res.json();
     const incoming = Array.isArray(data.messages) ? data.messages : [];
-    document.getElementById('chat-status').textContent = 'LIVE';
-
-    if(incoming.length){
-      const fromOthers = incoming.filter(m=>m.user !== currentUser).length;
-      chatMessages = chatMessages.concat(incoming);
-      // Keep the client-side buffer bounded; the server keeps the archive.
-      if(chatMessages.length > 200) chatMessages = chatMessages.slice(-200);
-      chatLastId = incoming[incoming.length-1].id;
-      if(chatOpen){
-        renderChat();
-      } else if(fromOthers > 0){
-        chatUnread += fromOthers;
-        updateChatBadge();
-      }
-      if(fromOthers > 0 && !force) Sfx.play('coin', 1.25);
-    } else if(force){
-      renderChat();
+    if(typeof Realtime === 'undefined' || !Realtime.isLive()){
+      document.getElementById('chat-status').textContent = 'POLLING';
     }
+
+    ingestChatMessages(incoming, force);
   }catch(e){
     const st = document.getElementById('chat-status');
     if(st) st.textContent = 'OFFLINE';
@@ -161,7 +175,14 @@ async function sendChatMessage(){
 function startChatPolling(){
   stopChatPolling();
   refreshChat(true);
-  chatPollTimer = setInterval(()=>{ if(currentUser) refreshChat(false); }, CHAT_POLL_MS);
+  // The socket delivers messages the moment they're posted; this poll stays
+  // as the fallback and backs right off while the socket is healthy, so a
+  // dropped connection costs a few seconds of latency rather than the room.
+  chatPollTimer = setInterval(()=>{
+    if(!currentUser) return;
+    if(typeof Realtime !== 'undefined' && Realtime.isLive()) return;
+    refreshChat(false);
+  }, CHAT_POLL_MS);
 }
 
 function stopChatPolling(){

@@ -82,6 +82,7 @@ function afterLogin(){
   if(typeof TV !== 'undefined') TV.start();
   if(typeof renderRival === 'function') setTimeout(renderRival, 800);
   if(typeof wireSecretSpots === 'function') wireSecretSpots();
+  if(typeof Realtime !== 'undefined') Realtime.start();
   if(typeof refreshGlobalStats === 'function') refreshGlobalStats();
   if(typeof loadClans === 'function') loadClans().then(()=>{
     if(typeof renderChat === 'function') renderChat();
@@ -90,6 +91,7 @@ function afterLogin(){
 
 function logout(){
   stopAllGames();
+  if(typeof Realtime !== 'undefined') Realtime.stop();
   stopGlobalPolling();
   stopPlaytimeHeartbeat();
   stopChatPolling();
@@ -124,21 +126,27 @@ const BROADCAST_SEEN_KEY = "level7_broadcast_seen";
 let globalPollTimer = null;
 let lastBroadcastContent = '';
 
+// Shared by the 15s poll and the socket push, so an announcement lands the
+// same way whichever arrives first.
+function applyBroadcast(data){
+  if(!data) return;
+  lastBroadcastContent = data.content || '';
+  const seen = sessionStorage.getItem(BROADCAST_SEEN_KEY);
+  const banner = document.getElementById('broadcast-banner');
+  if(data.content && data.updatedAt !== seen){
+    document.getElementById('broadcast-banner-text').textContent = '📣 ' + data.content;
+    banner.classList.remove('hidden');
+    banner.dataset.updatedAt = data.updatedAt;
+  } else if(!data.content){
+    banner.classList.add('hidden');
+  }
+}
+
 async function pollBroadcast(){
   try{
     const res = await fetch(`${LB_API_BASE}/broadcast`);
     if(!res.ok) return;
-    const data = await res.json();
-    lastBroadcastContent = data.content || '';
-    const seen = sessionStorage.getItem(BROADCAST_SEEN_KEY);
-    const banner = document.getElementById('broadcast-banner');
-    if(data.content && data.updatedAt !== seen){
-      document.getElementById('broadcast-banner-text').textContent = '📣 ' + data.content;
-      banner.classList.remove('hidden');
-      banner.dataset.updatedAt = data.updatedAt;
-    } else if(!data.content){
-      banner.classList.add('hidden');
-    }
+    applyBroadcast(await res.json());
   }catch(e){ /* non-critical, ignore */ }
 }
 

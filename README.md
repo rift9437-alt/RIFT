@@ -1,50 +1,104 @@
-# Level 7 — Live Leaderboard Server
+# Level 7
 
-This is a tiny backend that makes the arcade leaderboard **shared and live**
-across every player, instead of each browser keeping its own private copy
-in `localStorage`.
+A browser arcade with 29 cabinets, a shared live leaderboard, chat, clans,
+tournaments and a token economy.
 
-https://rift-1-edfr.onrender.com/
+**Play:** https://rift9437-alt.github.io/RIFT/
 
-## How it works
+## How it's put together
 
-- `server.js` is a small Express app that does **two jobs**:
-  - Serves the game itself from `public/` at `/`.
-  - Exposes the leaderboard API:
-    - `GET /api/leaderboard` — returns the current standings for every user.
-    - `POST /api/leaderboard/update` — applies a stat change for one user/game.
-    - `GET /api/chat` / `POST /api/chat` — the shared chat room (see below).
-- Data is stored in `leaderboard.json`, a plain JSON file that's created
-  automatically the first time the server runs. No database to install.
-- The game page polls `GET /api/leaderboard` every 4 seconds while the
-  Leaderboard screen is open, and calls the update endpoint right after
-  each match finishes. So if your friend on another device wins a match,
-  your screen reflects it within a few seconds.
+Two pieces, hosted separately.
 
-Because the server now serves the page itself, there's **only one thing to
-run and one URL to share** — no separate static host, no editing any
-config to point the page at the API.
+| | Where | What it does |
+| --- | --- | --- |
+| **Site** | GitHub Pages, from `public/` | Everything you see and play. Static files only. |
+| **API + realtime** | Render — `https://rift-1-edfr.onrender.com` | Postgres-backed state, the REST API, and the WebSocket. |
+
+The split is why the site loads instantly off a CDN while the parts that
+have to be shared — scores, chat, wallets — stay on one authoritative
+server. Visiting the Render URL in a browser just redirects you back to the
+site, so there's still only one link worth sharing.
+
+The client works out which backend to talk to at load time in
+`public/js/core/config.js`, which is the only place the backend URL appears.
+It stays same-origin when the API server is also serving the page (local
+dev), and points at Render otherwise. To aim a page at a different backend
+without editing anything, append `?api=https://some-other-host` — it sticks
+for the session; `?api=` on its own clears it.
+
+### Realtime
+
+A WebSocket at `/ws` pushes chat messages, score changes, presence and admin
+announcements the moment they happen, instead of waiting for the next poll.
+The client authenticates with the same bearer token the REST API uses, so
+the socket grants no authority the token didn't already have, and it is
+push-only: **every** state change still goes through a POST that validates
+it.
+
+That makes the socket an accelerator, not a dependency. The HTTP pollers are
+still there and simply back off while the socket is healthy, so losing the
+connection costs a few seconds of latency and never correctness. Three
+things can go wrong and all three are handled:
+
+- **A clean disconnect** — `onclose` fires, the pollers resume immediately,
+  and the client reconnects on a backoff (1s → 30s).
+- **Coming back from offline or a sleeping tab** — the `online` and
+  `visibilitychange` events trigger an immediate retry rather than waiting
+  out the backoff. Measured at ~1.5s to recover.
+- **A socket that dies silently** — a dropped Wi-Fi link or a proxy reaping
+  an idle connection can leave a socket that looks open but delivers
+  nothing, which would keep the pollers switched off and quietly freeze the
+  page. A watchdog probes anything that's been quiet for 25s and hangs up if
+  there's no answer within 5s, so this is caught in ~30-40s. The probe
+  doubles as the application-level keepalive that stops proxies reaping the
+  connection in the first place.
+
+The status pill on the chat dock shows `LIVE` or `POLLING` so you can see
+which mode you're in.
 
 ## Running it locally
 
 ```bash
 npm install
-npm start
+SERVE_STATIC=1 npm start
 ```
 
-The server listens on port 3000 by default (override with `PORT=xxxx npm start`).
-You should see:
+`SERVE_STATIC=1` puts the front end back on this server, so one command and
+one URL is still all you need for development. You should see:
 
 ```
-Leaderboard server running on http://localhost:3000
+Level 7 API running on http://localhost:3000
+  serving the front end from public/
 ```
 
-Open `http://localhost:3000` in a browser — that's the full game, already
-talking to the live leaderboard. Test the API directly with:
+Open `http://localhost:3000`. Without `SERVE_STATIC`, the server runs
+API-only and redirects browsers to the deployed site — which is how it runs
+on Render. Test the API directly with:
 
 ```bash
 curl http://localhost:3000/api/leaderboard
+curl http://localhost:3000/healthz
 ```
+
+## Deploying
+
+**The site** deploys itself. `.github/workflows/pages.yml` publishes
+`public/` to GitHub Pages on every push to `main` that touches it. One-time
+setup: **Settings → Pages → Source: GitHub Actions**. The workflow copies
+`index.html` to `404.html` so deep links land on the app instead of
+GitHub's error page.
+
+**The API** is a normal Node service on Render (`npm install && npm start`)
+with `DATABASE_URL` pointing at Postgres. Two optional environment
+variables:
+
+- `SITE_ORIGIN` — where to redirect browsers. Defaults to the Pages URL;
+  set it if that ever changes.
+- `SERVE_STATIC=1` — serve the front end from this server too, disabling
+  the redirect.
+
+If you move either piece, the URLs live in exactly two places:
+`public/js/core/config.js` (site → API) and `SITE_ORIGIN` (API → site).
 
 ## Hosting it for real
 
@@ -55,23 +109,8 @@ Whatever URL that host gives you (e.g. `https://your-app.onrender.com`)
 is the link you share with everyone — the game and the live leaderboard
 are both right there.
 
-### If you'd rather host the page separately anyway
-
-You can still split them up if you want (e.g. a CDN for the page, a tiny
-box for the API). Open `public/js/core/leaderboard.js`, find this line:
-
-```js
-const LB_API_BASE = '/api';
-```
-
-and change it to the full URL of wherever you deploy the server, e.g.:
-
-```js
-const LB_API_BASE = 'https://leaderboard.yoursite.com/api';
-```
-
-The server already sends permissive CORS headers, so this works cross-origin
-out of the box. If you want to lock it down to just your game's domain later,
+The server sends permissive CORS headers, which is what makes the
+Pages-to-Render split work. To lock it down to just your own domain later,
 edit the `Access-Control-Allow-Origin` header in `server.js`.
 
 ## Keeping it running
@@ -86,10 +125,10 @@ or the machine reboots. A couple of common options:
 
 ## Backing up / resetting scores
 
-All the data lives in one file: `leaderboard.json`, sitting next to
-`server.js`. To back it up, just copy that file. To wipe the leaderboard
-and start over, stop the server, delete `leaderboard.json`, and restart —
-it'll regenerate with everyone at zero.
+Everything lives in Postgres, pointed at by `DATABASE_URL`. Back it up with
+`pg_dump` the way you would any database. To wipe the standings without
+touching wallets or cosmetics, use **Reset Leaderboard** in the admin panel;
+to reset one player entirely, use **Reset Player**.
 
 ## Adding more users later
 
@@ -380,9 +419,8 @@ platform layout. Wins are tracked on the Leaderboard.
 
 ## Update Log & admin panel
 
-There's an in-game "Update Log" cabinet that shows patch notes, pulled
-from `updatelog.txt` (auto-created next to `leaderboard.json`, same idea —
-back it up or edit it the same way).
+There's an in-game "Update Log" cabinet that shows patch notes, stored in
+the `updatelog` table and edited from the admin panel.
 
 To change the log from inside the page itself, click the **LEVEL 7** logo
 in the top bar **5 times quickly** to open a hidden admin panel. Enter the
