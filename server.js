@@ -204,7 +204,8 @@ const REASON_QTY_CAPS = {
   depths_wave: 1,
   stack_block: 5,
   golf_hole: 5,
-  sumo_win: 1, sumo_loss: 1
+  sumo_win: 1, sumo_loss: 1,
+  secret_found: 1
 };
 
 const DEFAULT_STATS = {
@@ -259,6 +260,7 @@ const REWARDS = {
   stack_block: 2,        // per block landed on the tower
   golf_hole: 15,         // per hole sunk
   sumo_win: 20, sumo_loss: 5,
+  secret_found: 40,       // an easter egg discovered
   towerdefense_wave: 8,   // per wave survived
   parkour_gate: 2,        // per checkpoint/gate cleared
   parkour_finish: 25,     // per time-trial course completed

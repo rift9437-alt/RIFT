@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/games.css">
   <link rel="stylesheet" href="css/companions.css">
   <link rel="stylesheet" href="css/ui.css">
+  <link rel="stylesheet" href="css/qol.css">
 </head>
 <body>
 <div class="scanlines"></div>
@@ -64,6 +65,9 @@
       <div class="community-sub">Same 3 challenges for everyone, every day. Clear all 3 to keep your streak alive for a bigger bonus.</div>
       <div class="cosmetic-grid" id="daily-grid"></div>
     </div>
+    <div class="tv-set" id="tv-set"></div>
+    <div class="rival-panel hidden" id="rival-panel"></div>
+
     <div class="dash-title">SELECT A CABINET</div>
     <div class="dash-toolbar" id="dash-toolbar">
       <button class="filter-chip active" data-filter="all" onclick="setCabinetFilter('all')">All</button>
@@ -72,6 +76,16 @@
       <button class="filter-chip" data-filter="3d" onclick="setCabinetFilter('3d')">3D</button>
       <button class="filter-chip" data-filter="new" onclick="setCabinetFilter('new')">New</button>
       <button class="filter-chip" data-filter="strategy" onclick="setCabinetFilter('strategy')">Strategy</button>
+      <div class="dash-search">
+        <input type="text" id="cabinet-search" placeholder="Search games…" autocomplete="off"
+               oninput="setCabinetSearch(this.value)">
+      </div>
+      <div class="layout-btns">
+        <button class="layout-btn active" data-layout="grid" onclick="setDashLayout('grid')" title="Grid">▦</button>
+        <button class="layout-btn" data-layout="compact" onclick="setDashLayout('compact')" title="Compact">▪</button>
+        <button class="layout-btn" data-layout="large" onclick="setDashLayout('large')" title="Large cards">◼</button>
+        <button class="layout-btn" data-layout="list" onclick="setDashLayout('list')" title="List">☰</button>
+      </div>
       <button class="surprise-btn" onclick="surpriseMe()">🎲 Surprise Me</button>
     </div>
     <div class="cabinet-grid" id="cabinet-grid"></div>
@@ -1659,6 +1673,7 @@
 </div>
 
 <!-- ============ GIFT TOASTS (top-right, auto-dismiss) ============ -->
+<div id="toast-stack"></div>
 <div id="gift-toast-stack" style="position:fixed; top:70px; right:16px; z-index:10500; display:flex; flex-direction:column; gap:10px; max-width:300px;"></div>
 
 <!-- ============ ZIP THEME COMPANION SIDEBAR (Equipped Theme Feature) ============ -->
@@ -1772,6 +1787,7 @@
 <script src="js/games/runeduel.js"></script>
 <script src="js/games/warlord.js"></script>
 <script src="js/features/admin.js"></script>
+<script src="js/features/qol.js"></script>
 <script src="js/core/pause.js"></script>
 <script src="js/core/init.js"></script>
 </body>

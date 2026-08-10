@@ -79,6 +79,9 @@ function afterLogin(){
   refreshCabinets();
   openChatDock();
   startChatPolling();
+  if(typeof TV !== 'undefined') TV.start();
+  if(typeof renderRival === 'function') setTimeout(renderRival, 800);
+  if(typeof wireSecretSpots === 'function') wireSecretSpots();
 }
 
 function logout(){

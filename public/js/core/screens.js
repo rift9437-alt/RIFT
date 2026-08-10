@@ -18,6 +18,8 @@ function backToDashboard(){
   showScreen('dashboard-screen');
   refreshCabinets();
   loadDailyChallenges();
+  if(typeof renderRival === 'function') renderRival();
+  if(typeof TV !== 'undefined') TV.refresh();
 }
 function stopAllGames(){
   SoccerGame.stop();

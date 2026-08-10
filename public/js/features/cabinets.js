@@ -139,6 +139,11 @@ function actuallyLaunchCabinet(id){
   Sfx.play('select');
   stopAllGames();
   showScreen(cab.screen);
+  if(typeof Prefs !== 'undefined' && cab.mod){
+    Prefs.noteRecent(id);
+    lastPlayedCabinet = id;
+    applyRememberedChoices(cab.screen);
+  }
   if(cab.mod){
     const game = cab.mod();
     if(typeof game.reset === 'function') game.reset();
@@ -227,20 +232,52 @@ function cabinetBestText(cab){
 function renderCabinets(){
   const grid = document.getElementById('cabinet-grid');
   if(!grid) return;
-  const visible = CABINETS.filter(c=>{
-    if(cabinetFilter === 'all') return true;
-    return c.tags.includes(cabinetFilter);
+
+  const layout = (typeof Prefs !== 'undefined' && Prefs.get('layout')) || 'grid';
+  grid.className = 'cabinet-grid' + (layout === 'grid' ? '' : ' layout-' + layout);
+
+  const query = (typeof cabinetSearch !== 'undefined' ? cabinetSearch : '');
+  const recents = (typeof Prefs !== 'undefined' ? Prefs.get('recents') : []) || [];
+
+  let visible = CABINETS.filter(c=>{
+    if(cabinetFilter !== 'all' && !c.tags.includes(cabinetFilter)) return false;
+    if(!query) return true;
+    // Search across name, blurb and tags so "racing" finds Apex Loop.
+    const extra = (typeof CABINET_KEYWORDS !== 'undefined' && CABINET_KEYWORDS[c.id]) || '';
+    const hay = (c.name + ' ' + c.desc + ' ' + c.tags.join(' ') + ' ' + (c.stat||'') + ' ' + extra).toLowerCase();
+    return hay.includes(query);
   });
+
+  // Favourites float to the top; everything else keeps catalogue order.
+  if(typeof Prefs !== 'undefined'){
+    visible = visible.slice().sort((a,b)=>{
+      const fa = Prefs.isFavourite(a.id) ? 0 : 1;
+      const fb = Prefs.isFavourite(b.id) ? 0 : 1;
+      return fa - fb;
+    });
+  }
+
+  if(!visible.length){
+    grid.innerHTML = `<div class="dash-empty">No cabinets match “${escapeHtml(query)}”.</div>`;
+    return;
+  }
+
   grid.innerHTML = visible.map(cab=>{
     const tags = cab.tags.map(t=>`<span class="cab-tag cab-tag-${t}">${TAG_LABELS[t]||t}</span>`).join('');
+    const fav = typeof Prefs !== 'undefined' && Prefs.isFavourite(cab.id);
+    const recentIdx = recents.indexOf(cab.id);
     return `
       <div class="cabinet ${cab.leader?'cabinet-leader':''}" style="--accent-c:${cab.accent}" onclick="launchCabinet('${cab.id}')">
+        <button class="fav-star ${fav?'on':''}" title="${fav?'Unpin':'Pin to top'}"
+                onclick="toggleCabinetFavourite('${cab.id}', event)">${fav?'★':'☆'}</button>
+        ${fav ? '<div class="cabinet-pin">Pinned</div>' : ''}
         <div class="cabinet-icon">${cab.icon}</div>
         <div class="cabinet-name">${cab.name}</div>
         ${tags ? `<div class="cabinet-tags">${tags}</div>` : ''}
         <div class="cabinet-desc">${cab.desc}</div>
         <div class="cabinet-stat">${cab.stat}</div>
         <div class="cabinet-best">${cabinetBestText(cab)}</div>
+        ${recentIdx >= 0 ? `<div class="cabinet-recent-badge">🕒 ${recentIdx === 0 ? 'Last played' : '#' + (recentIdx+1) + ' recent'}</div>` : ''}
       </div>
     `;
   }).join('');
