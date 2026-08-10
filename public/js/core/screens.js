@@ -20,6 +20,7 @@ function backToDashboard(){
   loadDailyChallenges();
   if(typeof renderRival === 'function') renderRival();
   if(typeof TV !== 'undefined') TV.refresh();
+  if(typeof refreshGlobalStats === 'function') refreshGlobalStats();
 }
 function stopAllGames(){
   SoccerGame.stop();

@@ -586,7 +586,7 @@ const GAME_DISPLAY_NAMES = {
   burger: 'Burger Rush', tag: 'Neon Tag', robot: 'Robot Arena'
 };
 
-const DEFAULT_WALLET = { tokens: 0, owned: ['neon'], equipped: 'neon', companion: null, asteroidUpgrades: { extraLife: 0, turnSpeed: 0, autoTurret: 0 }, wildduelUpgrades: { extraHp: 0, fasterReload: 0, fasterMovement: 0 }, roguelikeUpgrades: { extraHp: 0, swordDamage: 0, magicPower: 0, swiftBoots: 0 }, achievements: [], stats: { bricksBroken: 0, racesFinished: 0, winStreak: 0, bestWinStreak: 0, tokensEarnedLifetime: 0, secondsPlayed: 0, maxTokensHeld: 0, crateOpens: 0, legendaryCratePulls: 0 }, titles: [], borders: [], seasonBadges: [], xp: 0, level: 1, avatar: '🙂', banner: 'default', friends: [], pendingGifts: [], animatedName: false, createdAt: null, gamePlays: {}, unlockedAvatars: [], unlockedBanners: [], prestige: 0, prestigeBadgeColor: null, daily: null, dailyStreak: 0, dailyBestStreak: 0, dailyLastPerfectDate: null, lastSpinDate: null };
+const DEFAULT_WALLET = { tokens: 0, owned: ['neon'], equipped: 'neon', companion: null, asteroidUpgrades: { extraLife: 0, turnSpeed: 0, autoTurret: 0 }, wildduelUpgrades: { extraHp: 0, fasterReload: 0, fasterMovement: 0 }, roguelikeUpgrades: { extraHp: 0, swordDamage: 0, magicPower: 0, swiftBoots: 0 }, achievements: [], secretsFound: 0, stats: { bricksBroken: 0, racesFinished: 0, winStreak: 0, bestWinStreak: 0, tokensEarnedLifetime: 0, secondsPlayed: 0, maxTokensHeld: 0, crateOpens: 0, legendaryCratePulls: 0 }, titles: [], borders: [], seasonBadges: [], xp: 0, level: 1, avatar: '🙂', banner: 'default', friends: [], pendingGifts: [], animatedName: false, createdAt: null, gamePlays: {}, unlockedAvatars: [], unlockedBanners: [], prestige: 0, prestigeBadgeColor: null, daily: null, dailyStreak: 0, dailyBestStreak: 0, dailyLastPerfectDate: null, lastSpinDate: null };
 
 // ---------------------------------------------------------------------------
 // Daily Challenges
@@ -1825,6 +1825,181 @@ app.get('/api/wallet', async (req, res) => {
   res.json(data[user].wallet);
 });
 
+// ---------------------------------------------------------------------------
+// Rotating shop
+// ---------------------------------------------------------------------------
+// Daily, weekly and event slots that discount items already in the catalog.
+// The rotation is *derived* from the date rather than stored, so every client
+// sees the same offers at the same time, a restart doesn't reroll them, and
+// there's no extra table to keep in sync. The discount is applied on the
+// server at purchase time — the client never sends a price.
+const ROTATION = {
+  daily:  { slots: 3, min: 0.10, max: 0.30, label: 'Daily Deals' },
+  weekly: { slots: 2, min: 0.25, max: 0.45, label: 'Weekly Feature' },
+  secret: { slots: 1, min: 0.50, max: 0.60, label: 'Back Room' }
+};
+
+// A small deterministic PRNG (mulberry32) seeded from a string, so
+// "2026-08-10:daily" always produces the same picks on every process.
+function seededRandom(seed){
+  let h = 1779033703 ^ seed.length;
+  for(let i = 0; i < seed.length; i++){
+    h = Math.imul(h ^ seed.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  let a = h >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function dayKey(now){ return new Date(now || Date.now()).toISOString().slice(0, 10); }
+function weekKey(now){
+  // ISO-ish week bucket: days since epoch / 7. Good enough to roll weekly and
+  // to stay stable inside a week.
+  const d = new Date(now || Date.now());
+  return 'w' + Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 604800000);
+}
+
+// Items eligible for a discount: real cosmetics only. Free, limited-edition
+// and community-goal items stay out so the rotation can't undercut or
+// give away something that's meant to be earned.
+function rotatableIds(){
+  return Object.keys(SHOP_ITEMS).filter(id => {
+    const it = SHOP_ITEMS[id];
+    return it.type !== 'upgrade' && it.type !== 'community_goal'
+        && !it.limited && it.cost > 0;
+  }).sort();
+}
+
+function rollSlots(kind, key){
+  const cfg = ROTATION[kind];
+  const rand = seededRandom(key + ':' + kind);
+  const pool = rotatableIds();
+  const picks = [];
+  const taken = new Set();
+  for(let i = 0; i < cfg.slots && taken.size < pool.length; i++){
+    let id;
+    do { id = pool[Math.floor(rand() * pool.length)]; } while(taken.has(id));
+    taken.add(id);
+    // Quantise the discount to whole 5% steps so it reads as a real price tag.
+    const spread = cfg.max - cfg.min;
+    const pct = Math.round((cfg.min + rand() * spread) * 20) / 20;
+    const base = SHOP_ITEMS[id].cost;
+    picks.push({
+      id,
+      name: SHOP_ITEMS[id].name,
+      base,
+      cost: Math.max(1, Math.round(base * (1 - pct))),
+      discount: Math.round(pct * 100)
+    });
+  }
+  return picks;
+}
+
+// The single source of truth for "what does this item cost right now".
+// Both the shop endpoint and the purchase endpoint call this, so a discount
+// shown in the UI is exactly the one charged.
+function effectivePrice(itemId, user, data){
+  const base = (SHOP_ITEMS[itemId] || COMMUNITY_SHOP_THEMES[itemId] || {}).cost;
+  if (typeof base !== 'number') return null;
+  const offers = currentRotation(user, data);
+  let best = base;
+  ['daily', 'weekly', 'secret'].forEach(kind => {
+    const hit = (offers[kind] || []).find(o => o.id === itemId);
+    if (hit && hit.cost < best) best = hit.cost;
+  });
+  return best;
+}
+
+// The Back Room only opens for players who've actually found a secret, which
+// is what `secretsFound` on the wallet tracks.
+function currentRotation(user, data){
+  const now = Date.now();
+  const out = {
+    daily: rollSlots('daily', dayKey(now)),
+    weekly: rollSlots('weekly', weekKey(now)),
+    secret: [],
+    labels: { daily: ROTATION.daily.label, weekly: ROTATION.weekly.label, secret: ROTATION.secret.label },
+    resetsAt: {
+      daily: Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), new Date(now).getUTCDate() + 1),
+      weekly: (Math.floor(now / 604800000) + 1) * 604800000
+    }
+  };
+  const wallet = user && data && data[user] ? data[user].wallet : null;
+  if (wallet && (wallet.secretsFound || 0) > 0) {
+    out.secret = rollSlots('secret', dayKey(now) + ':' + (wallet.secretsFound || 0));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Global counters
+// ---------------------------------------------------------------------------
+// Arcade-wide totals, derived from the player records rather than kept as a
+// separate counter — nothing to drift out of sync, and a wiped leaderboard
+// is reflected immediately. Cached briefly because it walks every record.
+let globalStatsCache = { at: 0, value: null };
+const GLOBAL_STATS_TTL_MS = 20000;
+
+async function globalStats(){
+  if (globalStatsCache.value && Date.now() - globalStatsCache.at < GLOBAL_STATS_TTL_MS) {
+    return globalStatsCache.value;
+  }
+  const data = await loadData();
+  const totals = {
+    tokensEarned: 0, secondsPlayed: 0, gamesPlayed: 0, secretsFound: 0,
+    cratesOpened: 0, achievementsUnlocked: 0, levelsGained: 0
+  };
+  const perGame = {};
+  USERS.forEach(u => {
+    const w = (data[u] && data[u].wallet) || {};
+    const st = w.stats || {};
+    totals.tokensEarned += st.tokensEarnedLifetime || 0;
+    totals.secondsPlayed += st.secondsPlayed || 0;
+    totals.cratesOpened += st.crateOpens || 0;
+    totals.secretsFound += w.secretsFound || 0;
+    totals.achievementsUnlocked += (w.achievements || []).length;
+    totals.levelsGained += Math.max(0, (w.level || 1) - 1);
+    Object.entries(w.gamePlays || {}).forEach(([g, n]) => {
+      perGame[g] = (perGame[g] || 0) + n;
+      totals.gamesPlayed += n;
+    });
+  });
+  const busiest = Object.entries(perGame).sort((a, b) => b[1] - a[1])[0];
+  const value = {
+    totals,
+    perGame,
+    busiest: busiest ? { game: busiest[0], name: GAME_DISPLAY_NAMES[busiest[0]] || busiest[0], plays: busiest[1] } : null,
+    players: USERS.length
+  };
+  globalStatsCache = { at: Date.now(), value };
+  return value;
+}
+
+app.get('/api/global-stats', async (req, res) => {
+  try {
+    res.json(await globalStats());
+  } catch (e) {
+    console.error('Global stats failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.get('/api/shop/rotation', async (req, res) => {
+  const user = authenticate(req);
+  try {
+    const data = user ? await loadData() : null;
+    res.json(currentRotation(user, data));
+  } catch (e) {
+    console.error('Shop rotation failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
 app.get('/api/shop/items', (req, res) => {
   res.json(Object.assign({}, SHOP_ITEMS, COMMUNITY_SHOP_THEMES, { [COMMUNITY_GOAL_THEME_ID]: COMMUNITY_GOAL_THEME }));
 });
@@ -1880,6 +2055,8 @@ app.post('/api/wallet/earn', async (req, res) => {
       }
       wallet.stats.maxTokensHeld = Math.max(wallet.stats.maxTokensHeld || 0, wallet.tokens);
       if (reason === 'breaker_brick') wallet.stats.bricksBroken += safeQty;
+      // Finding a secret is what opens the shop's Back Room.
+      if (reason === 'secret_found') wallet.secretsFound = (wallet.secretsFound || 0) + safeQty;
       if (reason === 'racing_win' || reason === 'racing_loss') wallet.stats.racesFinished += 1;
       if (WIN_REASONS.includes(reason)) {
         wallet.stats.winStreak += 1;
@@ -1937,7 +2114,9 @@ app.post('/api/shop/purchase', async (req, res) => {
       if (shopItem.requires && !wallet.owned.includes(shopItem.requires)) {
         return { error: 'Missing prerequisite' };
       }
-      const cost = shopItem.cost;
+      // Never trust a price from the client — resolve it here, from the same
+      // function that built the offer the player clicked.
+      const cost = effectivePrice(itemId, user, data) ?? shopItem.cost;
       if (wallet.tokens < cost) {
         return { error: 'Not enough tokens' };
       }

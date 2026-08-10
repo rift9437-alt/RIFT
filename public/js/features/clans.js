@@ -211,3 +211,65 @@ async function submitBugReport(){
     status.textContent = 'Network error — try again.';
   }
 }
+
+/* =========================================================
+   GLOBAL COUNTERS
+   =========================================================
+   Arcade-wide totals, derived server-side from the player records. Nothing
+   here is a stored counter, so it can't drift away from the real data. */
+let globalStatsCache = null;
+
+function compactNumber(n){
+  if(n >= 1000000) return (n / 1000000).toFixed(n >= 10000000 ? 0 : 1) + 'M';
+  if(n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k';
+  return String(Math.round(n));
+}
+
+function hoursText(seconds){
+  const h = seconds / 3600;
+  if(h >= 1) return h.toFixed(h >= 10 ? 0 : 1) + 'h';
+  return Math.round(seconds / 60) + 'm';
+}
+
+async function loadGlobalStats(){
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/global-stats`, { headers: authHeaders() });
+    if(!res.ok) throw new Error('Bad response: ' + res.status);
+    globalStatsCache = await res.json();
+  }catch(e){
+    console.error('Global stats load failed:', e);
+  }
+  return globalStatsCache;
+}
+
+function renderGlobalStats(){
+  const box = document.getElementById('global-panel');
+  if(!box || !globalStatsCache) return;
+  const t = globalStatsCache.totals;
+  const busiest = globalStatsCache.busiest;
+  const cells = [
+    ['🪙', compactNumber(t.tokensEarned), 'tokens earned'],
+    ['🎮', compactNumber(t.gamesPlayed), 'games played'],
+    ['⏱', hoursText(t.secondsPlayed), 'time on the machines'],
+    ['🏅', compactNumber(t.achievementsUnlocked), 'achievements'],
+    ['📦', compactNumber(t.cratesOpened), 'crates opened'],
+    ['🔍', compactNumber(t.secretsFound), 'secrets found']
+  ];
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <div class="global-head">ARCADE TOTALS · ALL ${globalStatsCache.players} KEYHOLDERS</div>
+    <div class="global-grid">
+      ${cells.map(([icon, value, label]) => `
+        <div class="global-cell">
+          <span class="global-icon">${icon}</span>
+          <b>${value}</b>
+          <i>${label}</i>
+        </div>`).join('')}
+    </div>
+    ${busiest ? `<div class="global-busiest">Busiest cabinet: <b>${busiest.name}</b> · ${compactNumber(busiest.plays)} plays</div>` : ''}`;
+}
+
+async function refreshGlobalStats(){
+  await loadGlobalStats();
+  renderGlobalStats();
+}

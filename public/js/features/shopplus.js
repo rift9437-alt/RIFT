@@ -210,8 +210,79 @@ function initShopPlus(){
     window.renderShop = async function(){
       const out = await original.apply(this, arguments);
       decorateShopCards();
+      await loadShopRotation();
+      renderShopRotation();
       return out;
     };
     window.renderShop.__wrapped = true;
   }
+}
+
+/* =========================================================
+   ROTATING SHOP
+   =========================================================
+   Daily / weekly / back-room slots. The server derives these from the date,
+   so everyone sees the same offers and a reload doesn't reroll them. The
+   discounted price shown here is the one the server charges — this code
+   never sends an amount. */
+let shopRotation = null;
+
+async function loadShopRotation(){
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/shop/rotation`, { headers: authHeaders() });
+    if(!res.ok) throw new Error('Bad response: ' + res.status);
+    shopRotation = await res.json();
+  }catch(e){
+    console.error('Shop rotation load failed:', e);
+    shopRotation = null;
+  }
+  return shopRotation;
+}
+
+function countdownText(ms){
+  const left = Math.max(0, ms - Date.now());
+  const h = Math.floor(left / 3600000);
+  const m = Math.floor((left % 3600000) / 60000);
+  if(h >= 24) return Math.floor(h / 24) + 'd ' + (h % 24) + 'h';
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function renderShopRotation(){
+  const box = document.getElementById('shop-rotation');
+  if(!box) return;
+  if(!shopRotation){ box.innerHTML = ''; return; }
+
+  const section = (kind, icon, resetMs) => {
+    const offers = shopRotation[kind] || [];
+    if(!offers.length) return '';
+    const label = (shopRotation.labels && shopRotation.labels[kind]) || kind;
+    const timer = resetMs ? `<span class="rot-timer">resets in ${countdownText(resetMs)}</span>` : '';
+    return `
+      <div class="rot-section rot-${kind}">
+        <div class="rot-head"><span>${icon} ${label}</span>${timer}</div>
+        <div class="rot-row">
+          ${offers.map(o => {
+            const owned = wallet.owned && wallet.owned.includes(o.id);
+            return `
+              <div class="rot-card ${owned ? 'rot-owned' : ''}">
+                <div class="rot-name">${o.name}</div>
+                <div class="rot-price">
+                  <s>${o.base}</s>
+                  <b>🪙 ${o.cost}</b>
+                  <span class="rot-off">-${o.discount}%</span>
+                </div>
+                ${owned
+                  ? '<span class="rot-owned-tag">✓ Owned</span>'
+                  : `<button class="btn btn-primary btn-small" onclick="handlePurchase('${o.id}')">Buy</button>`}
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  };
+
+  const resets = shopRotation.resetsAt || {};
+  box.innerHTML =
+    section('secret', '🚪', null) +
+    section('daily', '⏱', resets.daily) +
+    section('weekly', '⭐', resets.weekly);
 }

@@ -200,6 +200,33 @@ Three of them are actually 3D, with no libraries and no WebGL:
 Both approaches share the arcade's flat-neon look and stay comfortably at
 60fps on a normal laptop.
 
+## Rotating shop
+
+Above the main catalog the shop runs three rotating slots:
+
+- **Daily Deals** — three themes at 10–30% off, rerolling at UTC midnight
+- **Weekly Feature** — two at 25–45% off, rerolling weekly
+- **Back Room** — one at 50–60% off, and it only opens once you've found a
+  secret somewhere in the arcade
+
+The rotation isn't stored anywhere. It's derived from the date with a seeded
+PRNG (mulberry32 over a `"2026-08-10:daily"` style key), so every player sees
+the same offers at the same moment, a server restart doesn't reroll them, and
+there's no extra table to keep in sync. Free items, season-limited themes and
+merge upgrades are excluded so a deal can't undercut something meant to be
+earned.
+
+The discount is resolved server-side at purchase time by the same function
+that builds the offer — the client never sends a price.
+
+## Arcade totals
+
+A panel on the dashboard shows arcade-wide counters: tokens earned, games
+played, time on the machines, achievements, crates opened, secrets found,
+and the busiest cabinet. Every number is derived from the player records
+rather than kept as its own counter, so nothing can drift out of sync — with
+a 20-second cache, since it walks every record.
+
 ## Clans
 
 Found a clan for 250 tokens and other players can join it, up to ten members.
