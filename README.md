@@ -200,6 +200,28 @@ Three of them are actually 3D, with no libraries and no WebGL:
 Both approaches share the arcade's flat-neon look and stay comfortably at
 60fps on a normal laptop.
 
+## Admin panel
+
+Five clicks on the logo opens it. Everything posts the admin password with
+each call and the server is the only thing that checks it — the panel is a
+convenience, not the security boundary.
+
+Alongside the existing tools (grant/set coins, reset a player, unlock themes,
+set a floor, reset the leaderboard, broadcast, clear chat, ban, clone, and an
+emergency lockdown) there's now:
+
+- **Inspect a player** — wallet, level, podium points, clan and role,
+  cosmetics owned, achievements, titles, secrets, lifetime tokens, time
+  played, and per-game stats on one screen
+- **Grant a single cosmetic** — one item to one player, idempotent
+- **Grant an achievement** — pays its reward exactly as if it had been
+  earned, so tokens, titles and borders all land properly
+- **Bug report triage** — list what players have filed and mark each
+  open / fixed / won't fix
+
+The item and achievement pickers are populated from the catalogs the client
+has already loaded, so there's no id to type by hand.
+
 ## The Gazette and the Archive
 
 One screen, two halves.

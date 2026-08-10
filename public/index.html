@@ -1614,6 +1614,44 @@
       <button class="btn btn-pink" style="margin-top:6px;" onclick="adminResetLeaderboard()">Reset Leaderboard</button>
     </div>
 
+    <div class="admin-section">
+      <div class="tagline" style="text-align:left; margin-top:0;">inspect a player</div>
+      <label class="field-label" for="admin-player-user">User</label>
+      <select id="admin-player-user"></select>
+      <div class="login-error" id="admin-player-error"></div>
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="adminLookupPlayer()">Look Up</button>
+      <div id="admin-player-out"></div>
+    </div>
+
+    <div class="admin-section">
+      <div class="tagline" style="text-align:left; margin-top:0;">grant a single cosmetic</div>
+      <label class="field-label" for="admin-item-user">User</label>
+      <select id="admin-item-user"></select>
+      <label class="field-label" for="admin-item-id">Item</label>
+      <select id="admin-item-id"></select>
+      <div class="login-error" id="admin-item-error"></div>
+      <div class="admin-success" id="admin-item-success"></div>
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="adminGrantItem()">Grant Item</button>
+    </div>
+
+    <div class="admin-section">
+      <div class="tagline" style="text-align:left; margin-top:0;">grant an achievement (pays its reward)</div>
+      <label class="field-label" for="admin-ach-user">User</label>
+      <select id="admin-ach-user"></select>
+      <label class="field-label" for="admin-ach-id">Achievement</label>
+      <select id="admin-ach-id"></select>
+      <div class="login-error" id="admin-ach-error"></div>
+      <div class="admin-success" id="admin-ach-success"></div>
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="adminGrantAchievement()">Grant Achievement</button>
+    </div>
+
+    <div class="admin-section">
+      <div class="tagline" style="text-align:left; margin-top:0;">bug reports</div>
+      <div class="login-error" id="admin-bugs-error"></div>
+      <button class="btn btn-secondary" style="margin-top:6px;" onclick="adminLoadBugs()">Refresh Reports</button>
+      <div id="admin-bugs-out"></div>
+    </div>
+
     <div class="admin-section admin-section-danger">
       <div class="tagline" style="text-align:left; margin-top:0;">emergency server lockdown</div>
       <div style="font-family:var(--font-mono); font-size:11px; opacity:0.8; margin-bottom:6px;">Blocks logins and all gameplay writes (scores, tokens, purchases) until turned off. The site stays viewable.</div>

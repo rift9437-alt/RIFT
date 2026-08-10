@@ -3768,6 +3768,116 @@ app.post('/api/admin/clone-player', async (req, res) => {
 
 // Admin-only: flip emergency lockdown mode on/off. See the LOCKDOWN
 // middleware above for exactly what this blocks.
+// Admin-only: grant a single shop item (theme, companion, merge upgrade) to
+// one player, without charging them and without touching anyone else.
+app.post('/api/admin/grant-item', async (req, res) => {
+  const { password, user, itemId } = req.body || {};
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Incorrect admin password' });
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  const catalog = Object.assign({}, SHOP_ITEMS, COMMUNITY_SHOP_THEMES, { [COMMUNITY_GOAL_THEME_ID]: COMMUNITY_GOAL_THEME });
+  if (!catalog[itemId]) return res.status(400).json({ error: 'Unknown item' });
+  try {
+    const result = await withWriteLock(async () => {
+      const data = await loadData();
+      const wallet = data[user].wallet;
+      if (!Array.isArray(wallet.owned)) wallet.owned = ['neon'];
+      if (wallet.owned.includes(itemId)) return { already: true };
+      wallet.owned.push(itemId);
+      await saveData(data);
+      return { owned: wallet.owned.length };
+    });
+    logAdminAction('grant_item', { user, itemId, already: !!result.already });
+    res.json({ user, itemId, name: catalog[itemId].name, already: !!result.already });
+  } catch (e) {
+    console.error('Admin grant item failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Admin-only: grant an achievement, paying out its reward exactly as if the
+// player had earned it — so titles, borders and tokens all land properly.
+app.post('/api/admin/grant-achievement', async (req, res) => {
+  const { password, user, achievementId } = req.body || {};
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Incorrect admin password' });
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  const ach = ACHIEVEMENTS[achievementId];
+  if (!ach) return res.status(400).json({ error: 'Unknown achievement' });
+  try {
+    const result = await withWriteLock(async () => {
+      const data = await loadData();
+      const wallet = data[user].wallet;
+      if (!Array.isArray(wallet.achievements)) wallet.achievements = [];
+      if (wallet.achievements.includes(achievementId)) return { already: true };
+      wallet.achievements.push(achievementId);
+      const reward = ach.reward || {};
+      if (reward.tokens) {
+        wallet.tokens += reward.tokens;
+        if (!wallet.stats) wallet.stats = {};
+        wallet.stats.tokensEarnedLifetime = (wallet.stats.tokensEarnedLifetime || 0) + reward.tokens;
+      }
+      if (reward.title) {
+        if (!Array.isArray(wallet.titles)) wallet.titles = [];
+        if (!wallet.titles.includes(reward.title)) wallet.titles.push(reward.title);
+      }
+      if (reward.border) {
+        if (!Array.isArray(wallet.borders)) wallet.borders = [];
+        if (!wallet.borders.includes(reward.border)) wallet.borders.push(reward.border);
+      }
+      await saveData(data);
+      return { tokens: wallet.tokens };
+    });
+    logAdminAction('grant_achievement', { user, achievementId, already: !!result.already });
+    res.json({ user, achievementId, name: ach.name, already: !!result.already, tokens: result.tokens });
+  } catch (e) {
+    console.error('Admin grant achievement failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Admin-only: everything about one player on a single screen — wallet,
+// per-game stats, achievements, clan, and how they rank overall.
+app.post('/api/admin/player', async (req, res) => {
+  const { password, user } = req.body || {};
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Incorrect admin password' });
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  try {
+    const data = await loadData();
+    const rec = data[user];
+    const w = rec.wallet || {};
+    let clan = null;
+    try {
+      const { rows } = await pool.query(
+        `SELECT c.tag, c.name, m.role FROM clan_members m
+         JOIN clans c ON c.id = m.clan_id WHERE m.user_id = $1`, [user]);
+      clan = rows[0] || null;
+    } catch (e) { console.error('Admin player clan lookup failed:', e); }
+
+    const games = {};
+    Object.keys(DEFAULT_STATS).forEach(g => {
+      const stats = rec[g] || {};
+      if (Object.values(stats).some(v => v > 0)) games[g] = stats;
+    });
+
+    res.json({
+      user,
+      banned: !!rec.banned,
+      clan,
+      points: clanPointsFor(user, data),
+      wallet: {
+        tokens: w.tokens || 0, level: w.level || 1, xp: w.xp || 0,
+        prestige: w.prestige || 0, equipped: w.equipped,
+        owned: (w.owned || []).length, achievements: (w.achievements || []),
+        titles: w.titles || [], secretsFound: w.secretsFound || 0,
+        stats: w.stats || {}, createdAt: w.createdAt || null
+      },
+      games
+    });
+  } catch (e) {
+    console.error('Admin player lookup failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
 app.post('/api/admin/lockdown', async (req, res) => {
   const { password, enabled } = req.body || {};
   if (password !== ADMIN_PASSWORD) {

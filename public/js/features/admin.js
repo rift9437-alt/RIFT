@@ -35,9 +35,12 @@ async function openAdminModal(){
 
   const userOptions = USERS.map(u => `<option value="${u}">${u}</option>`).join('');
   ['admin-grant-user','admin-setcoins-user','admin-quick-user','admin-floor-user',
-   'admin-clone-from','admin-clone-to','admin-ban-user','admin-resetplayer-user'].forEach(id=>{
-    document.getElementById(id).innerHTML = userOptions;
+   'admin-clone-from','admin-clone-to','admin-ban-user','admin-resetplayer-user',
+   'admin-player-user','admin-item-user','admin-ach-user'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = userOptions;
   });
+  populateAdminCatalogs();
   document.getElementById('admin-clone-to').selectedIndex = Math.min(1, USERS.length-1);
 
   ['grant','setcoins','quick','floor','clone','broadcast','ban','logs','resetplayer','resetlb','lockdown'].forEach(section=>{
@@ -468,4 +471,135 @@ async function adminSetLockdown(enabled){
     console.error('Lockdown toggle failed:', e);
     err.textContent = 'Failed — check the server is running.';
   }
+}
+
+/* =========================================================
+   ADMIN: PLAYER INSPECTOR, GRANTS, BUG TRIAGE
+   =========================================================
+   All of these post the admin password with each call, the same way the
+   rest of the panel does — the server is the only thing that checks it. */
+
+// Fill the item and achievement pickers from the catalogs the client has
+// already loaded, so the admin never has to type an id by hand.
+function populateAdminCatalogs(){
+  const itemSel = document.getElementById('admin-item-id');
+  if(itemSel && typeof shopCatalog !== 'undefined' && shopCatalog){
+    itemSel.innerHTML = Object.entries(shopCatalog)
+      .sort((a, b) => (a[1].name || a[0]).localeCompare(b[1].name || b[0]))
+      .map(([id, it]) => `<option value="${id}">${it.name || id}</option>`).join('');
+  }
+  const achSel = document.getElementById('admin-ach-id');
+  if(achSel && typeof achievementsCatalog !== 'undefined' && achievementsCatalog){
+    achSel.innerHTML = Object.entries(achievementsCatalog)
+      .map(([id, a]) => `<option value="${id}">${a.icon || ''} ${a.name || id}</option>`).join('');
+  }
+}
+
+async function adminPost(path, body, errId){
+  const err = errId ? document.getElementById(errId) : null;
+  if(err) err.textContent = '';
+  try{
+    const res = await apiFetch(`${LB_API_BASE}${path}`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(Object.assign(
+        { password: document.getElementById('admin-password').value }, body))
+    });
+    const data = await res.json().catch(()=>({}));
+    if(res.status === 401){
+      if(err) err.textContent = 'ACCESS DENIED — wrong admin password.';
+      return null;
+    }
+    if(!res.ok){
+      if(err) err.textContent = data.error || 'That did not work.';
+      return null;
+    }
+    return data;
+  }catch(e){
+    console.error('Admin request failed:', path, e);
+    if(err) err.textContent = 'Network error — try again.';
+    return null;
+  }
+}
+
+async function adminLookupPlayer(){
+  const user = document.getElementById('admin-player-user').value;
+  const out = document.getElementById('admin-player-out');
+  out.innerHTML = '<div class="admin-note">Loading…</div>';
+  const d = await adminPost('/admin/player', { user }, 'admin-player-error');
+  if(!d){ out.innerHTML = ''; return; }
+  const s = d.wallet.stats || {};
+  const rows = [
+    ['Tokens', d.wallet.tokens],
+    ['Level', `${d.wallet.level} (prestige ${d.wallet.prestige})`],
+    ['Podium points', d.points],
+    ['Clan', d.clan ? `[${d.clan.tag}] ${d.clan.name} · ${d.clan.role}` : '—'],
+    ['Cosmetics owned', d.wallet.owned],
+    ['Achievements', d.wallet.achievements.length],
+    ['Titles', (d.wallet.titles || []).join(', ') || '—'],
+    ['Secrets found', d.wallet.secretsFound],
+    ['Lifetime tokens', s.tokensEarnedLifetime || 0],
+    ['Time played', Math.round((s.secondsPlayed || 0) / 60) + ' min'],
+    ['Best win streak', s.bestWinStreak || 0],
+    ['Banned', d.banned ? 'YES' : 'no']
+  ];
+  const games = Object.entries(d.games || {});
+  out.innerHTML = `
+    <table class="admin-table">
+      ${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}
+    </table>
+    <div class="admin-note">${games.length ? 'Games played:' : 'No game stats yet.'}</div>
+    ${games.length ? `<table class="admin-table">
+      ${games.map(([g, st]) => `<tr><th>${g}</th><td>${
+        Object.entries(st).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${v}`).join(' · ') || '—'
+      }</td></tr>`).join('')}
+    </table>` : ''}`;
+}
+
+async function adminGrantItem(){
+  const ok = document.getElementById('admin-item-success');
+  ok.textContent = '';
+  const d = await adminPost('/admin/grant-item', {
+    user: document.getElementById('admin-item-user').value,
+    itemId: document.getElementById('admin-item-id').value
+  }, 'admin-item-error');
+  if(!d) return;
+  ok.textContent = d.already
+    ? `${d.user} already owned ${d.name}.`
+    : `Granted ${d.name} to ${d.user}.`;
+}
+
+async function adminGrantAchievement(){
+  const ok = document.getElementById('admin-ach-success');
+  ok.textContent = '';
+  const d = await adminPost('/admin/grant-achievement', {
+    user: document.getElementById('admin-ach-user').value,
+    achievementId: document.getElementById('admin-ach-id').value
+  }, 'admin-ach-error');
+  if(!d) return;
+  ok.textContent = d.already
+    ? `${d.user} already had ${d.name}.`
+    : `Granted ${d.name} to ${d.user} — balance now ${d.tokens}.`;
+}
+
+async function adminLoadBugs(id, status){
+  const out = document.getElementById('admin-bugs-out');
+  out.innerHTML = '<div class="admin-note">Loading…</div>';
+  const d = await adminPost('/admin/bugs', id ? { id, status } : {}, 'admin-bugs-error');
+  if(!d){ out.innerHTML = ''; return; }
+  const reports = d.reports || [];
+  if(!reports.length){ out.innerHTML = '<div class="admin-note">No reports filed.</div>'; return; }
+  out.innerHTML = reports.map(r => `
+    <div class="admin-bug admin-bug-${r.status}">
+      <div class="admin-bug-head">
+        <b>#${r.id}</b> ${r.user_id} · ${r.area}
+        <span class="admin-bug-status">${r.status}</span>
+      </div>
+      <div class="admin-bug-body">${escapeHtml(r.body)}</div>
+      <div class="admin-bug-actions">
+        <button class="btn btn-small btn-secondary" onclick="adminLoadBugs(${r.id},'fixed')">Fixed</button>
+        <button class="btn btn-small btn-secondary" onclick="adminLoadBugs(${r.id},'wontfix')">Won't fix</button>
+        <button class="btn btn-small btn-ghost" onclick="adminLoadBugs(${r.id},'open')">Reopen</button>
+      </div>
+    </div>`).join('');
 }
