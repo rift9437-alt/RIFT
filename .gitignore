@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+
+# Local data files the server creates next to itself
+leaderboard.json
+updatelog.txt
+
+.DS_Store
+*.log
