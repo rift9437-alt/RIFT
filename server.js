@@ -1355,10 +1355,12 @@ app.post('/api/login', async (req, res) => {
 
 // Serve the game itself from this same server, so "npm start" + one URL
 // is all you need — no separate static host, no editing LB_API_BASE.
-// (Only this one file is exposed; server.js/package.json/leaderboard.json
-// are not served.)
+// Only the public/ directory is exposed, so server.js, package.json and any
+// local data files stay unreachable no matter what path is requested.
+const PUBLIC_DIR = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC_DIR, { index: false, maxAge: '1h' }));
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'level7_12.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
 app.get('/api/leaderboard', async (req, res) => {

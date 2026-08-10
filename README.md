@@ -9,7 +9,7 @@ https://rift-1-edfr.onrender.com/
 ## How it works
 
 - `server.js` is a small Express app that does **two jobs**:
-  - Serves the game itself (`level7_12.html`) at `/`.
+  - Serves the game itself from `public/` at `/`.
   - Exposes the leaderboard API:
     - `GET /api/leaderboard` — returns the current standings for every user.
     - `POST /api/leaderboard/update` — applies a stat change for one user/game.
@@ -58,8 +58,7 @@ are both right there.
 ### If you'd rather host the page separately anyway
 
 You can still split them up if you want (e.g. a CDN for the page, a tiny
-box for the API). Open `level7_12.html`, find this line in the leaderboard
-section:
+box for the API). Open `public/js/core/leaderboard.js`, find this line:
 
 ```js
 const LB_API_BASE = '/api';
@@ -106,6 +105,39 @@ node -e "const c=require('crypto');const s=c.randomBytes(16).toString('hex');con
 ```
 
 and drop the result into `PASSWORD_HASHES` in `server.js`.
+
+## Project layout
+
+The page used to be one 16,000-line HTML file. It's now split so a change to
+one game can't disturb anything else:
+
+```
+public/
+  index.html              markup only — no inline CSS or JS
+  css/
+    base.css              tokens, reset, login
+    dashboard.css         the cabinet grid
+    features.css          community, profile, loot crates
+    games.css             per-cabinet styling
+    companions.css        the theme companion characters
+    ui.css                leaderboard, chat, admin, shared HUD
+  js/
+    core/                 auth, screens, leaderboard, currency, sfx,
+                          settings, sprites, mini3d, pause, init
+    features/             chat, shop, achievements, daily, community,
+                          profile, crates, party, builder, admin, ...
+    games/                one file per cabinet (23 of them)
+```
+
+The scripts are plain (non-module) files loaded in order, exactly as they ran
+when inlined, so every shared global still works — this was a file layout
+change, not a rewrite. **Load order in `index.html` matters**: `core/` first,
+then `features/`, then `games/`, and `core/init.js` last.
+
+To add a cabinet: drop a file in `js/games/`, add its `<script>` tag before
+`core/pause.js`, add the screen markup to `index.html`, and add an entry to
+`CABINETS` in `js/features/cabinets.js`. Wire the stat into `DEFAULT_STATS`
+in `server.js` and add a row to `LB_BOARDS` for the leaderboard.
 
 ## The cabinets
 
