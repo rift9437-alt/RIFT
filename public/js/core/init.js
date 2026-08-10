@@ -4,6 +4,9 @@
 (function init(){
   loadSettings();
   initQol();
+  initResults();
+  initShopPlus();
+  initFlair();
   renderCabinets();
   const savedUser = sessionStorage.getItem(SESSION_KEY);
   const savedToken = sessionStorage.getItem(SESSION_TOKEN_KEY);

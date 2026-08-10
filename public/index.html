@@ -48,6 +48,9 @@
       <span class="token-badge" id="token-balance">🪙 0</span>
       <button class="icon-btn" id="sound-toggle-btn" onclick="toggleSound()" title="Toggle sound">🔊</button>
       <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
+      <button class="icon-btn" id="music-toggle-btn" onclick="toggleMenuMusic()" title="Menu music">🎶</button>
+      <button class="icon-btn" onclick="openCollection()" title="Collection">📚</button>
+      <button class="icon-btn" onclick="openInventory()" title="Inventory">🎒</button>
       <button class="shop-btn" onclick="stopAllGames(); showScreen('shop-screen'); renderShop();">Shop</button>
       <button class="shop-btn" onclick="stopAllGames(); showScreen('achievements-screen'); renderAchievements();">🏆 Achievements</button>
       <button class="shop-btn" onclick="stopAllGames(); showScreen('profile-screen'); renderProfile(currentUser);">👤 Profile</button>
@@ -1250,6 +1253,30 @@
       <span class="shop-balance" id="shop-balance">🪙 0</span>
     </div>
     <div class="shop-message" id="shop-message"></div>
+    <div id="shop-toolbar">
+      <div class="dash-search"><input type="text" id="shop-search" placeholder="Search shop…"
+           oninput="setShopFilter({q:this.value.trim().toLowerCase()})"></div>
+      <button class="filter-chip active" data-rarity="all" onclick="setShopFilter({rarity:'all'})">All</button>
+      <button class="filter-chip" data-rarity="common" onclick="setShopFilter({rarity:'common'})">Common</button>
+      <button class="filter-chip" data-rarity="rare" onclick="setShopFilter({rarity:'rare'})">Rare</button>
+      <button class="filter-chip" data-rarity="epic" onclick="setShopFilter({rarity:'epic'})">Epic</button>
+      <button class="filter-chip" data-rarity="legendary" onclick="setShopFilter({rarity:'legendary'})">Legendary</button>
+      <button class="filter-chip active" data-show="all" onclick="setShopFilter({show:'all'})">Everything</button>
+      <button class="filter-chip" data-show="unowned" onclick="setShopFilter({show:'unowned'})">Not owned</button>
+      <button class="filter-chip" data-show="owned" onclick="setShopFilter({show:'owned'})">Owned</button>
+      <button class="filter-chip" data-show="wishlist" onclick="setShopFilter({show:'wishlist'})">♥ Wishlist</button>
+      <button class="filter-chip" data-show="affordable" onclick="setShopFilter({show:'affordable'})">Can afford</button>
+      <select onchange="setShopFilter({sort:this.value})">
+        <option value="default">Sort: default</option>
+        <option value="cheap">Cheapest first</option>
+        <option value="expensive">Most expensive</option>
+        <option value="rarity">Rarity</option>
+        <option value="name">Name A–Z</option>
+      </select>
+      <span id="shop-count"></span>
+    </div>
+    <div id="shop-empty" class="dash-empty hidden">Nothing matches those filters.</div>
+
     <div class="shop-columns">
       <div class="shop-grid" id="shop-grid"></div>
       <div class="shop-merge-col">
@@ -1608,6 +1635,7 @@
       <span class="chat-title">Arcade Chat</span>
       <div class="chat-head-actions">
         <span id="chat-status" style="font-size:9px; letter-spacing:1px; color:var(--text-dim);">LIVE</span>
+        <button class="chat-mini-btn" onclick="toggleEmotePicker()" title="Emotes">😀</button>
         <button class="chat-mini-btn" onclick="refreshChat(true)" title="Refresh">⟳</button>
         <button class="chat-mini-btn" onclick="toggleChatDock()" title="Minimise">–</button>
       </div>
@@ -1616,6 +1644,7 @@
       <div class="chat-note">Loading the room…</div>
     </div>
     <div class="chat-error" id="chat-error"></div>
+    <div id="emote-picker" class="hidden"></div>
     <div class="chat-input-row">
       <input type="text" id="chat-input" maxlength="300" autocomplete="off" placeholder="Say something to the other keyholders…" />
       <button class="chat-send" id="chat-send" onclick="sendChatMessage()">Send</button>
@@ -1641,6 +1670,38 @@
       <div class="toggle" id="setting-shake" onclick="toggleSetting('shake')"></div>
     </div>
     <button class="btn btn-primary" onclick="closeSettings()">Done</button>
+  </div>
+</div>
+
+
+<!-- ============ COLLECTION SCREEN ============ -->
+<div id="collection-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:760px;">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">📚 COLLECTION</div>
+    <span class="hud-chip" id="collection-overall" style="margin-left:auto;">—</span>
+  </div>
+  <div style="width:100%; max-width:760px;">
+    <div class="lb-card">
+      <h3>🗂 Collection Book</h3>
+      <div id="collection-body"></div>
+    </div>
+    <div class="shop-note">Everything you've unlocked across themes, avatars, banners, titles, badges, achievements and keys.</div>
+  </div>
+</div>
+
+<!-- ============ INVENTORY SCREEN ============ -->
+<div id="inventory-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:1000px;">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🎒 INVENTORY</div>
+  </div>
+  <div style="width:100%; max-width:1000px;">
+    <div class="lb-grid" id="inventory-body" style="max-width:none;"></div>
+    <div class="lb-card" style="margin-top:18px;">
+      <h3>🔑 Keys &amp; Locked Areas</h3>
+      <div id="keys-body"></div>
+    </div>
   </div>
 </div>
 
@@ -1788,6 +1849,10 @@
 <script src="js/games/warlord.js"></script>
 <script src="js/features/admin.js"></script>
 <script src="js/features/qol.js"></script>
+<script src="js/features/results.js"></script>
+<script src="js/features/shopplus.js"></script>
+<script src="js/features/collection.js"></script>
+<script src="js/features/flair.js"></script>
 <script src="js/core/pause.js"></script>
 <script src="js/core/init.js"></script>
 </body>

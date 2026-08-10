@@ -143,6 +143,8 @@ function actuallyLaunchCabinet(id){
     Prefs.noteRecent(id);
     lastPlayedCabinet = id;
     applyRememberedChoices(cab.screen);
+    if(typeof snapshotRun === 'function') snapshotRun(id);
+    if(typeof playStartAnimation === 'function') playStartAnimation(cab.name);
   }
   if(cab.mod){
     const game = cab.mod();
