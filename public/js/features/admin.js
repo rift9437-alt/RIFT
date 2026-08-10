@@ -41,6 +41,7 @@ async function openAdminModal(){
     if(el) el.innerHTML = userOptions;
   });
   populateAdminCatalogs();
+  populateAdminTournamentGames();
   document.getElementById('admin-clone-to').selectedIndex = Math.min(1, USERS.length-1);
 
   ['grant','setcoins','quick','floor','clone','broadcast','ban','logs','resetplayer','resetlb','lockdown'].forEach(section=>{
@@ -602,4 +603,60 @@ async function adminLoadBugs(id, status){
         <button class="btn btn-small btn-ghost" onclick="adminLoadBugs(${r.id},'open')">Reopen</button>
       </div>
     </div>`).join('');
+}
+
+/* ---- tournaments ----------------------------------------------------- */
+
+function populateAdminTournamentGames(){
+  const sel = document.getElementById('admin-trn-game');
+  if(!sel || typeof CABINETS === 'undefined') return;
+  sel.innerHTML = CABINETS.filter(c => c.best)
+    .map(c => `<option value="${c.best.game}">${c.icon} ${c.name} — ${c.best.key}</option>`).join('');
+}
+
+async function adminCreateTournament(){
+  const ok = document.getElementById('admin-trn-success');
+  ok.textContent = '';
+  const d = await adminPost('/admin/tournaments', {
+    action: 'create',
+    title: document.getElementById('admin-trn-title').value.trim(),
+    game: document.getElementById('admin-trn-game').value,
+    prize: Number(document.getElementById('admin-trn-prize').value) || 0,
+    hours: Number(document.getElementById('admin-trn-hours').value) || 24
+  }, 'admin-trn-error');
+  if(!d) return;
+  ok.textContent = 'Tournament started.';
+  renderAdminTournaments(d.tournaments);
+}
+
+async function adminListTournaments(){
+  const d = await adminPost('/admin/tournaments', { action: 'list' }, 'admin-trn-error');
+  if(d) renderAdminTournaments(d.tournaments);
+}
+
+async function adminTournamentAction(id, action){
+  if(action === 'delete' && !confirm('Delete tournament #' + id + '? Entries go with it.')) return;
+  const d = await adminPost('/admin/tournaments', { action, id }, 'admin-trn-error');
+  if(d) renderAdminTournaments(d.tournaments);
+}
+
+function renderAdminTournaments(list){
+  const out = document.getElementById('admin-trn-out');
+  if(!out) return;
+  if(!list || !list.length){ out.innerHTML = '<div class="admin-note">None yet.</div>'; return; }
+  out.innerHTML = `<table class="admin-table">
+    ${list.map(t => `
+      <tr>
+        <th>#${t.id} ${t.title}</th>
+        <td>
+          ${t.game}/${t.stat_key} · 🪙${t.prize} ·
+          ${t.settled ? `settled — ${t.winner ? t.winner + ' (+' + t.winning_gain + ')' : 'no winner'}`
+                      : 'ends ' + new Date(t.ends_at).toLocaleString()}
+          <div class="admin-bug-actions" style="margin-top:5px;">
+            ${t.settled ? '' : `<button class="btn btn-small btn-secondary" onclick="adminTournamentAction(${t.id},'end')">End now</button>`}
+            <button class="btn btn-small btn-ghost" onclick="adminTournamentAction(${t.id},'delete')">Delete</button>
+          </div>
+        </td>
+      </tr>`).join('')}
+  </table>`;
 }

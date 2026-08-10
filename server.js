@@ -1338,6 +1338,36 @@ async function initDb() {
   `);
   await pool.query('CREATE INDEX IF NOT EXISTS bug_reports_status_idx ON bug_reports (status, id DESC)');
 
+  // Tournaments: a timed contest on one cabinet's stat. Each entrant's value
+  // is recorded when they join, so the winner is decided by *improvement*
+  // during the window rather than by whoever already had the best score.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournaments (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      game TEXT NOT NULL,
+      stat_key TEXT NOT NULL,
+      prize INTEGER NOT NULL DEFAULT 0,
+      ends_at TIMESTAMPTZ NOT NULL,
+      settled BOOLEAN NOT NULL DEFAULT false,
+      winner TEXT,
+      winning_gain INTEGER,
+      final_standings JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  // Older rows predate the frozen-standings column.
+  await pool.query('ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS final_standings JSONB');
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournament_entries (
+      tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      start_value INTEGER NOT NULL,
+      joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (tournament_id, user_id)
+    )
+  `);
+
   // Reload any previously-finalized community theme winners into memory so
   // they keep showing up in the shop after a restart.
   try {
@@ -2045,6 +2075,148 @@ function loreFor(user, data){
       : { id: entry.id, title: '???', body: null, hint: entry.hint, unlocked: false };
   });
 }
+
+// ---------------------------------------------------------------------------
+// Tournaments
+// ---------------------------------------------------------------------------
+// A timed contest on one cabinet's stat. Joining records your current value,
+// so the standings rank *improvement during the window* — a player who
+// already holds the record starts level with everyone else, and someone who
+// joins late can still win. Settling pays the prize once and only once.
+function statValue(rec, game, key){
+  return (rec && rec[game] && typeof rec[game][key] === 'number') ? rec[game][key] : 0;
+}
+
+async function tournamentStandings(t, data){
+  const { rows: entries } = await pool.query(
+    'SELECT user_id, start_value FROM tournament_entries WHERE tournament_id = $1', [t.id]);
+  return entries.map(e => {
+    const now = statValue(data[e.user_id], t.game, t.stat_key);
+    return { user: e.user_id, start: e.start_value, now, gain: Math.max(0, now - e.start_value) };
+  }).sort((a, b) => b.gain - a.gain || a.user.localeCompare(b.user));
+}
+
+// Pays out any tournament whose clock has run out. Idempotent: the UPDATE
+// only matches while settled is still false, so two concurrent callers
+// can't both award the prize.
+async function settleDueTournaments(){
+  const { rows: due } = await pool.query(
+    'SELECT * FROM tournaments WHERE settled = false AND ends_at <= now()');
+  if (!due.length) return;
+  for (const t of due) {
+    try {
+      await withWriteLock(async () => {
+        const data = await loadData();
+        const standings = await tournamentStandings(t, data);
+        const top = standings.find(s => s.gain > 0) || null;
+        // Freeze the table as it stands right now. Recomputing it later from
+        // live stats would let scores set *after* the tournament ended
+        // rewrite its history and contradict the recorded winner.
+        const claim = await pool.query(
+          `UPDATE tournaments SET settled = true, winner = $1, winning_gain = $2,
+                  final_standings = $3::jsonb
+           WHERE id = $4 AND settled = false RETURNING id`,
+          [top ? top.user : null, top ? top.gain : 0,
+           JSON.stringify(standings), t.id]);
+        if (!claim.rows.length) return; // somebody else settled it first
+        if (top && t.prize > 0) {
+          const w = data[top.user].wallet;
+          w.tokens += t.prize;
+          if (!w.stats) w.stats = {};
+          w.stats.tokensEarnedLifetime = (w.stats.tokensEarnedLifetime || 0) + t.prize;
+          await saveData(data);
+        }
+      });
+    } catch (e) {
+      console.error('Tournament settle failed:', t.id, e);
+    }
+  }
+}
+
+app.get('/api/tournaments', async (req, res) => {
+  try {
+    await settleDueTournaments();
+    const data = await loadData();
+    const { rows } = await pool.query(
+      'SELECT * FROM tournaments ORDER BY settled ASC, ends_at DESC LIMIT 12');
+    const user = authenticate(req);
+    const out = [];
+    for (const t of rows) {
+      const standings = t.settled && Array.isArray(t.final_standings)
+        ? t.final_standings
+        : await tournamentStandings(t, data);
+      out.push({
+        id: t.id, title: t.title, game: t.game,
+        gameName: GAME_DISPLAY_NAMES[t.game] || t.game,
+        statKey: t.stat_key, prize: t.prize,
+        endsAt: t.ends_at, settled: t.settled,
+        winner: t.winner, winningGain: t.winning_gain,
+        entered: user ? standings.some(s => s.user === user) : false,
+        standings: standings.slice(0, 10)
+      });
+    }
+    res.json({ tournaments: out });
+  } catch (e) {
+    console.error('Tournament list failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/tournaments/join', async (req, res) => {
+  const { user, tournamentId } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM tournaments WHERE id = $1', [tournamentId]);
+    const t = rows[0];
+    if (!t) return res.status(404).json({ error: 'No such tournament.' });
+    if (t.settled || new Date(t.ends_at) <= new Date()) {
+      return res.status(400).json({ error: 'That tournament has finished.' });
+    }
+    const data = await loadData();
+    // ON CONFLICT DO NOTHING keeps a second join from resetting your baseline
+    // to a higher value — which would otherwise wipe out your own progress.
+    await pool.query(
+      `INSERT INTO tournament_entries (tournament_id, user_id, start_value)
+       VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [t.id, user, statValue(data[user], t.game, t.stat_key)]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Tournament join failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/admin/tournaments', async (req, res) => {
+  const { password, action, title, game, statKey, prize, hours, id } = req.body || {};
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Incorrect admin password' });
+  try {
+    if (action === 'create') {
+      if (!DEFAULT_STATS[game]) return res.status(400).json({ error: 'Unknown game' });
+      const key = statKey || Object.keys(DEFAULT_STATS[game])[0];
+      if (!(key in DEFAULT_STATS[game])) return res.status(400).json({ error: 'Unknown stat for that game' });
+      const hrs = Math.max(1, Math.min(720, Number(hours) || 24));
+      const { rows } = await pool.query(
+        `INSERT INTO tournaments (title, game, stat_key, prize, ends_at)
+         VALUES ($1, $2, $3, $4, now() + ($5 || ' hours')::interval) RETURNING id`,
+        [String(title || `${GAME_DISPLAY_NAMES[game] || game} Cup`).slice(0, 60),
+         game, key, Math.max(0, Math.min(100000, Number(prize) || 0)), String(hrs)]);
+      logAdminAction('tournament_create', { id: rows[0].id, game, key, hrs });
+    } else if (action === 'end') {
+      await pool.query('UPDATE tournaments SET ends_at = now() WHERE id = $1 AND settled = false', [id]);
+      await settleDueTournaments();
+      logAdminAction('tournament_end', { id });
+    } else if (action === 'delete') {
+      await pool.query('DELETE FROM tournaments WHERE id = $1', [id]);
+      logAdminAction('tournament_delete', { id });
+    }
+    const { rows } = await pool.query('SELECT * FROM tournaments ORDER BY id DESC LIMIT 20');
+    res.json({ tournaments: rows });
+  } catch (e) {
+    console.error('Admin tournament action failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
 
 app.get('/api/lore', async (req, res) => {
   const user = authenticate(req);

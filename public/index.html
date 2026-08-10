@@ -1646,6 +1646,23 @@
     </div>
 
     <div class="admin-section">
+      <div class="tagline" style="text-align:left; margin-top:0;">tournaments</div>
+      <label class="field-label" for="admin-trn-title">Title</label>
+      <input type="text" id="admin-trn-title" placeholder="e.g. Friday Night Crawl" />
+      <label class="field-label" for="admin-trn-game">Cabinet</label>
+      <select id="admin-trn-game"></select>
+      <label class="field-label" for="admin-trn-prize">Prize (tokens)</label>
+      <input type="number" id="admin-trn-prize" min="0" value="500" />
+      <label class="field-label" for="admin-trn-hours">Runs for (hours)</label>
+      <input type="number" id="admin-trn-hours" min="1" max="720" value="24" />
+      <div class="login-error" id="admin-trn-error"></div>
+      <div class="admin-success" id="admin-trn-success"></div>
+      <button class="btn btn-primary" style="margin-top:6px;" onclick="adminCreateTournament()">Start Tournament</button>
+      <button class="btn btn-secondary" style="margin-top:6px;" onclick="adminListTournaments()">Refresh List</button>
+      <div id="admin-trn-out"></div>
+    </div>
+
+    <div class="admin-section">
       <div class="tagline" style="text-align:left; margin-top:0;">bug reports</div>
       <div class="login-error" id="admin-bugs-error"></div>
       <button class="btn btn-secondary" style="margin-top:6px;" onclick="adminLoadBugs()">Refresh Reports</button>
@@ -2087,6 +2104,15 @@
     <div id="gazette-front"></div>
     <div id="gazette-archive"></div>
   </div>
+</div>
+
+<!-- ============ TOURNAMENTS SCREEN ============ -->
+<div id="tournaments-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:1000px;">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🏆 TOURNAMENTS</div>
+  </div>
+  <div class="clans-wrap" id="tournaments-body"></div>
 </div>
 
 <!-- ============ CLANS SCREEN ============ -->

@@ -200,6 +200,23 @@ Three of them are actually 3D, with no libraries and no WebGL:
 Both approaches share the arcade's flat-neon look and stay comfortably at
 60fps on a normal laptop.
 
+## Tournaments
+
+A timed contest on one cabinet's stat, started from the admin panel with a
+prize and a duration.
+
+Entering records your value at that moment, and the table ranks **improvement
+during the window** — so already holding the record doesn't hand you the
+trophy, and joining late doesn't rule you out. Re-entering can't reset your
+own baseline (the insert is `ON CONFLICT DO NOTHING`), which would otherwise
+wipe out your progress.
+
+When the clock runs out the tournament settles: the prize is paid once (the
+`UPDATE` only matches while `settled` is still false, so two concurrent
+callers can't both award it) and the final table is frozen into the row.
+Recomputing a finished table from live stats would let scores set afterwards
+rewrite its history and contradict the recorded winner.
+
 ## Admin panel
 
 Five clicks on the logo opens it. Everything posts the admin password with

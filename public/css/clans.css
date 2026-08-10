@@ -430,3 +430,68 @@
 .admin-bug-status { margin-left: auto; text-transform: uppercase; letter-spacing: 1px; }
 .admin-bug-body { margin: 6px 0 8px; line-height: 1.5; }
 .admin-bug-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* =========================================================
+   TOURNAMENTS
+   ========================================================= */
+.trn-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.trn-done { border-left-color: var(--text-dim); opacity: 0.78; }
+.trn-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.trn-title { font-weight: 600; font-size: 15px; }
+.trn-game, .trn-clock {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.trn-clock { margin-left: auto; }
+.trn-prize {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--gold);
+}
+.trn-in {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cyan);
+}
+.trn-result {
+  margin-top: 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+}
+.trn-result b { color: var(--gold); }
+
+.trn-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 11px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.trn-table th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--text-dim);
+  padding: 3px 8px 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.trn-table td { padding: 5px 8px 5px 0; }
+.trn-me td { color: var(--cyan); }
+.trn-empty {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
