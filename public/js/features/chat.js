@@ -80,7 +80,7 @@ function renderChat(){
     return `
       <div class="chat-msg ${mine?'me':''}">
         <div class="chat-msg-head">
-          <span class="chat-msg-user">${escapeHtml(m.user)}${mine?' (you)':''}</span>
+          <span class="chat-msg-user">${typeof clanTagFor === 'function' && clanTagFor(m.user) ? `<span class="clan-badge">[${escapeHtml(clanTagFor(m.user))}]</span>` : ''}${escapeHtml(m.user)}${mine?' (you)':''}</span>
           <span class="chat-msg-time">${chatTime(m.at)}</span>
         </div>
         <div class="chat-msg-body">${escapeHtml(m.text)}</div>

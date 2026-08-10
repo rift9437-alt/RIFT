@@ -200,6 +200,29 @@ Three of them are actually 3D, with no libraries and no WebGL:
 Both approaches share the arcade's flat-neon look and stay comfortably at
 60fps on a normal laptop.
 
+## Clans
+
+Found a clan for 250 tokens and other players can join it, up to ten members.
+A clan's score is the sum of its members' leaderboard points — the same
+"how many players do you beat on this board" number the rival panel uses —
+computed server-side from the standings, so it only moves when someone
+actually plays.
+
+Roles are leader → officer → member. Officers can remove members; only the
+leader can promote, demote, or remove an officer, and the leader can't be
+removed at all. A leader who leaves hands the clan to the longest-serving
+officer (or the longest-serving member if there are none); the last person
+out disbands it. Membership is one clan per player, enforced by the primary
+key on `clan_members` rather than by a check the client could skip.
+
+Your clan tag rides along next to your name in chat.
+
+## Bug reports
+
+Any player can file one from the Clans screen — pick an area, describe what
+happened, and it lands in `bug_reports` for triage from the admin panel
+(open / fixed / wontfix). Rate-limited to five per hour per player.
+
 ## Arcade chat
 
 There's a live chat room docked in the bottom-left corner of every screen,

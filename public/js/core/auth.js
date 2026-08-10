@@ -82,6 +82,9 @@ function afterLogin(){
   if(typeof TV !== 'undefined') TV.start();
   if(typeof renderRival === 'function') setTimeout(renderRival, 800);
   if(typeof wireSecretSpots === 'function') wireSecretSpots();
+  if(typeof loadClans === 'function') loadClans().then(()=>{
+    if(typeof renderChat === 'function') renderChat();
+  });
 }
 
 function logout(){

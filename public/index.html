@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="css/companions.css">
   <link rel="stylesheet" href="css/ui.css">
   <link rel="stylesheet" href="css/qol.css">
+<link rel="stylesheet" href="css/clans.css">
 </head>
 <body>
 <div class="scanlines"></div>
@@ -2036,6 +2037,40 @@
 
 
 <!-- ============ LEADERBOARD SCREEN ============ -->
+<!-- ============ CLANS SCREEN ============ -->
+<div id="clans-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:1000px;">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🛡 CLANS</div>
+    <button class="back-btn" onclick="openBugReport()">🐞 REPORT A BUG</button>
+  </div>
+  <div class="clans-wrap" id="clans-body"></div>
+</div>
+
+<!-- ============ BUG REPORT MODAL ============ -->
+<div id="bug-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h3>🐞 REPORT A BUG</h3>
+    <div class="tagline" style="text-align:left; margin-top:0;">what broke, and where</div>
+    <label class="field-label" for="bug-area">Area</label>
+    <select id="bug-area">
+      <option value="game">A game</option>
+      <option value="shop">Shop / tokens</option>
+      <option value="leaderboard">Leaderboard</option>
+      <option value="chat">Chat</option>
+      <option value="clans">Clans</option>
+      <option value="general">Something else</option>
+    </select>
+    <label class="field-label" for="bug-body">What happened?</label>
+    <textarea id="bug-body" rows="5" placeholder="What you did, what you expected, what happened instead."></textarea>
+    <div class="clan-error" id="bug-status"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="submitBugReport()">Send</button>
+      <button class="btn btn-ghost" onclick="closeBugReport()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div id="leaderboard-screen" class="screen hidden">
   <div class="game-topbar" style="max-width:1000px;">
     <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
@@ -2094,6 +2129,7 @@
 <script src="js/games/burger.js"></script>
 <script src="js/games/tag.js"></script>
 <script src="js/games/robot.js"></script>
+<script src="js/features/clans.js"></script>
 <script src="js/features/qol.js"></script>
 <script src="js/features/results.js"></script>
 <script src="js/features/shopplus.js"></script>

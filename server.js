@@ -1302,6 +1302,42 @@ async function initDb() {
     )
   `);
 
+  // Clans: a named group with a short tag, a leader, and members. Membership
+  // is one clan per player, enforced by the primary key on clan_members.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clans (
+      id SERIAL PRIMARY KEY,
+      tag TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL UNIQUE,
+      motto TEXT NOT NULL DEFAULT '',
+      colour TEXT NOT NULL DEFAULT '#2de2c5',
+      owner TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clan_members (
+      user_id TEXT PRIMARY KEY,
+      clan_id INTEGER NOT NULL REFERENCES clans(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'member',
+      joined_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS clan_members_clan_idx ON clan_members (clan_id)');
+
+  // Bug reports: anyone can file one, admins triage them from the panel.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bug_reports (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      area TEXT NOT NULL,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS bug_reports_status_idx ON bug_reports (status, id DESC)');
+
   // Reload any previously-finalized community theme winners into memory so
   // they keep showing up in the shop after a restart.
   try {
@@ -3380,6 +3416,271 @@ app.post('/api/admin/lockdown-status', async (req, res) => {
     return res.status(401).json({ error: 'Incorrect admin password' });
   }
   res.json({ lockdown: LOCKDOWN });
+});
+
+// ---------------------------------------------------------------------------
+// Clans
+// ---------------------------------------------------------------------------
+// One clan per player. A clan has a leader (the creator, who can never be
+// kicked), any number of officers who can invite and kick members, and
+// members. Clan score is derived from the same leaderboard standings the
+// rival panel uses, so it can't be inflated independently of actual play.
+const CLAN_COST = 250;          // tokens to found one
+const CLAN_TAG_RE = /^[A-Z0-9]{2,5}$/;
+const CLAN_NAME_RE = /^[\w '\-]{3,24}$/;
+const CLAN_MAX_MEMBERS = 10;
+
+// Points for one player = how many other players they beat on each board.
+// Same rule the client's rival panel uses, kept server-side so the clan
+// table can't be driven by a hand-edited client.
+function clanPointsFor(user, data){
+  let pts = 0;
+  Object.keys(DEFAULT_STATS).forEach(game => {
+    const keys = Object.keys(DEFAULT_STATS[game]);
+    if (!keys.length) return;
+    const key = keys[0];
+    const mine = ((data[user] && data[user][game]) || {})[key] || 0;
+    if (!mine) return;
+    USERS.forEach(other => {
+      if (other === user) return;
+      const theirs = ((data[other] && data[other][game]) || {})[key] || 0;
+      if (mine > theirs) pts++;
+    });
+  });
+  return pts;
+}
+
+async function clanRoster(){
+  const { rows: clans } = await pool.query(
+    'SELECT id, tag, name, motto, colour, owner, created_at FROM clans ORDER BY id');
+  const { rows: members } = await pool.query(
+    'SELECT user_id, clan_id, role FROM clan_members');
+  const data = await loadData();
+  const byClan = new Map(clans.map(c => [c.id, Object.assign({}, c, { members: [], score: 0 })]));
+  members.forEach(m => {
+    const c = byClan.get(m.clan_id);
+    if (!c) return;
+    const points = USERS.includes(m.user_id) ? clanPointsFor(m.user_id, data) : 0;
+    c.members.push({ user: m.user_id, role: m.role, points });
+    c.score += points;
+  });
+  const list = [...byClan.values()];
+  list.forEach(c => c.members.sort((a, b) => b.points - a.points));
+  list.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  return list;
+}
+
+async function membershipOf(user){
+  const { rows } = await pool.query(
+    'SELECT clan_id, role FROM clan_members WHERE user_id = $1', [user]);
+  return rows[0] || null;
+}
+
+app.get('/api/clans', async (req, res) => {
+  try {
+    res.json({ clans: await clanRoster(), cost: CLAN_COST, maxMembers: CLAN_MAX_MEMBERS });
+  } catch (e) {
+    console.error('Clan list failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/clans/create', async (req, res) => {
+  const { user, tag, name, motto, colour } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  const cleanTag = String(tag || '').toUpperCase().trim();
+  const cleanName = String(name || '').trim();
+  if (!CLAN_TAG_RE.test(cleanTag)) {
+    return res.status(400).json({ error: 'Tag must be 2-5 letters or numbers.' });
+  }
+  if (!CLAN_NAME_RE.test(cleanName)) {
+    return res.status(400).json({ error: 'Name must be 3-24 characters.' });
+  }
+  try {
+    const existing = await membershipOf(user);
+    if (existing) return res.status(400).json({ error: 'Leave your current clan first.' });
+
+    const result = await withWriteLock(async () => {
+      const data = await loadData();
+      if (data[user].wallet.tokens < CLAN_COST) {
+        return { error: `Founding a clan costs ${CLAN_COST} tokens.` };
+      }
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const ins = await client.query(
+          `INSERT INTO clans (tag, name, motto, colour, owner)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+          [cleanTag, cleanName, String(motto || '').slice(0, 80),
+           /^#[0-9a-fA-F]{6}$/.test(colour || '') ? colour : '#2de2c5', user]);
+        await client.query(
+          `INSERT INTO clan_members (user_id, clan_id, role) VALUES ($1, $2, 'leader')`,
+          [user, ins.rows[0].id]);
+        await client.query('COMMIT');
+        data[user].wallet.tokens -= CLAN_COST;
+        await saveData(data);
+        return { id: ins.rows[0].id, tokens: data[user].wallet.tokens };
+      } catch (err) {
+        await client.query('ROLLBACK');
+        if (err.code === '23505') return { error: 'That tag or name is already taken.' };
+        throw err;
+      } finally {
+        client.release();
+      }
+    });
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json(Object.assign({ clans: await clanRoster() }, result));
+  } catch (e) {
+    console.error('Clan create failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/clans/join', async (req, res) => {
+  const { user, clanId } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  try {
+    if (await membershipOf(user)) {
+      return res.status(400).json({ error: 'Leave your current clan first.' });
+    }
+    const { rows } = await pool.query('SELECT id FROM clans WHERE id = $1', [clanId]);
+    if (!rows.length) return res.status(404).json({ error: 'No such clan.' });
+    const { rows: countRows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM clan_members WHERE clan_id = $1', [clanId]);
+    if (countRows[0].n >= CLAN_MAX_MEMBERS) {
+      return res.status(400).json({ error: 'That clan is full.' });
+    }
+    await pool.query(
+      `INSERT INTO clan_members (user_id, clan_id, role) VALUES ($1, $2, 'member')`,
+      [user, clanId]);
+    res.json({ clans: await clanRoster() });
+  } catch (e) {
+    console.error('Clan join failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Leaving as the leader hands the clan to the longest-serving officer, or
+// the longest-serving member if there are no officers. An empty clan is
+// disbanded rather than left ownerless.
+app.post('/api/clans/leave', async (req, res) => {
+  const { user } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  try {
+    const me = await membershipOf(user);
+    if (!me) return res.status(400).json({ error: "You're not in a clan." });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM clan_members WHERE user_id = $1', [user]);
+      if (me.role === 'leader') {
+        const { rows: heirs } = await client.query(
+          `SELECT user_id FROM clan_members WHERE clan_id = $1
+           ORDER BY (role = 'officer') DESC, joined_at ASC LIMIT 1`, [me.clan_id]);
+        if (heirs.length) {
+          await client.query(
+            `UPDATE clan_members SET role = 'leader' WHERE user_id = $1`, [heirs[0].user_id]);
+          await client.query('UPDATE clans SET owner = $1 WHERE id = $2',
+            [heirs[0].user_id, me.clan_id]);
+        } else {
+          await client.query('DELETE FROM clans WHERE id = $1', [me.clan_id]);
+        }
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+    res.json({ clans: await clanRoster() });
+  } catch (e) {
+    console.error('Clan leave failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/clans/kick', async (req, res) => {
+  const { user, target } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  try {
+    const me = await membershipOf(user);
+    const them = await membershipOf(target);
+    if (!me || me.role === 'member') return res.status(403).json({ error: 'Officers and leaders only.' });
+    if (!them || them.clan_id !== me.clan_id) return res.status(400).json({ error: 'Not in your clan.' });
+    if (them.role === 'leader') return res.status(403).json({ error: "You can't kick the leader." });
+    if (me.role === 'officer' && them.role === 'officer') {
+      return res.status(403).json({ error: 'Only the leader can remove an officer.' });
+    }
+    await pool.query('DELETE FROM clan_members WHERE user_id = $1', [target]);
+    res.json({ clans: await clanRoster() });
+  } catch (e) {
+    console.error('Clan kick failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/clans/role', async (req, res) => {
+  const { user, target, role } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  if (role !== 'officer' && role !== 'member') {
+    return res.status(400).json({ error: 'Role must be officer or member.' });
+  }
+  try {
+    const me = await membershipOf(user);
+    const them = await membershipOf(target);
+    if (!me || me.role !== 'leader') return res.status(403).json({ error: 'Leaders only.' });
+    if (!them || them.clan_id !== me.clan_id) return res.status(400).json({ error: 'Not in your clan.' });
+    if (them.role === 'leader') return res.status(400).json({ error: "You're already the leader." });
+    await pool.query('UPDATE clan_members SET role = $1 WHERE user_id = $2', [role, target]);
+    res.json({ clans: await clanRoster() });
+  } catch (e) {
+    console.error('Clan role change failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Bug reports
+// ---------------------------------------------------------------------------
+app.post('/api/bugs/report', async (req, res) => {
+  const { user, area, body } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  const text = String(body || '').trim();
+  if (text.length < 10) return res.status(400).json({ error: 'Tell us a bit more — 10 characters minimum.' });
+  if (text.length > 1000) return res.status(400).json({ error: 'Keep it under 1000 characters.' });
+  try {
+    const { rows } = await pool.query(
+      'SELECT COUNT(*)::int AS n FROM bug_reports WHERE user_id = $1 AND created_at > now() - interval \'1 hour\'',
+      [user]);
+    if (rows[0].n >= 5) return res.status(429).json({ error: 'That is a lot of reports — try again later.' });
+    await pool.query('INSERT INTO bug_reports (user_id, area, body) VALUES ($1, $2, $3)',
+      [user, String(area || 'general').slice(0, 40), text]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Bug report failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/admin/bugs', async (req, res) => {
+  const { password, id, status } = req.body || {};
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Incorrect admin password' });
+  try {
+    if (id && status) {
+      if (!['open', 'fixed', 'wontfix'].includes(status)) {
+        return res.status(400).json({ error: 'Unknown status' });
+      }
+      await pool.query('UPDATE bug_reports SET status = $1 WHERE id = $2', [status, id]);
+      logAdminAction('bug_status', { id, status });
+    }
+    const { rows } = await pool.query(
+      'SELECT id, user_id, area, body, status, created_at FROM bug_reports ORDER BY id DESC LIMIT 100');
+    res.json({ reports: rows });
+  } catch (e) {
+    console.error('Admin bug list failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
 });
 
 initDb()
