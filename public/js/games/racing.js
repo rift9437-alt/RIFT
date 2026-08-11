@@ -435,7 +435,7 @@ const RacingGame = (function(){
       const a2 = ((i+0.5)/rumbleSteps)*Math.PI*2;
       ctx.fillStyle = i%2===0 ? 'rgba(255,80,80,0.7)' : 'rgba(255,255,255,0.5)';
       ctx.beginPath();
-      ctx.ellipse(CX,CY, OUTER_RX+1, OUTER_RY+1, 0, a1, a2); 
+      ctx.ellipse(CX,CY, OUTER_RX+1, OUTER_RY+1, 0, a1, a2);
       ctx.ellipse(CX,CY, OUTER_RX+14, OUTER_RY+14, 0, a2, a1, true);
       ctx.fill();
       // Inner rumble

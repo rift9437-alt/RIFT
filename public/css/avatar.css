@@ -1,0 +1,55 @@
+/* =========================================================
+   AVATAR CREATOR
+   ========================================================= */
+.avatar-wrap {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 18px 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 420px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+#avatar-canvas {
+  width: 100%;
+  height: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: grab;
+  touch-action: none;
+}
+#avatar-canvas:active { cursor: grabbing; }
+
+#avatar-controls {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.av-group { margin-bottom: 14px; }
+.av-row { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.av-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s ease;
+}
+.av-swatch:hover { transform: scale(1.12); }
+.av-swatch.selected {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--bg-panel), 0 0 10px var(--cyan);
+}
+.av-hat { padding: 6px 12px; font-size: 11px; }
+
+.av-actions { display: flex; gap: 8px; margin: 14px 0 4px; }
+.av-actions .btn { flex: 1; margin-top: 0; }
+
+@media (max-width: 820px) {
+  .avatar-wrap { grid-template-columns: 1fr; }
+}

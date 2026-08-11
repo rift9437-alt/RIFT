@@ -521,3 +521,55 @@ html.theme-image-active .icon-btn::before{
   pointer-events:none;
   z-index: -1;
 }
+
+/* =========================================================
+   ADMIN: PLAYER INSPECTOR + BUG TRIAGE
+   ========================================================= */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.admin-table th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--text-dim);
+  padding: 4px 8px 4px 0;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.admin-table td {
+  padding: 4px 0;
+  color: var(--text);
+  word-break: break-word;
+}
+.admin-note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 10px;
+}
+
+.admin-bug {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold);
+  border-radius: 8px;
+  padding: 9px 11px;
+  margin-top: 9px;
+  font-size: 11px;
+}
+.admin-bug-fixed { border-left-color: var(--cyan); opacity: 0.7; }
+.admin-bug-wontfix { border-left-color: var(--text-dim); opacity: 0.55; }
+.admin-bug-head {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+}
+.admin-bug-status { margin-left: auto; text-transform: uppercase; letter-spacing: 1px; }
+.admin-bug-body { margin: 6px 0 8px; line-height: 1.5; }
+.admin-bug-actions { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -1,0 +1,120 @@
+/* =========================================================
+   ROTATING SHOP SLOTS
+   ========================================================= */
+#shop-rotation { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+
+.rot-section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.rot-secret { border-color: var(--pink); }
+.rot-weekly { border-color: var(--gold); }
+
+.rot-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.rot-secret .rot-head span:first-child { color: var(--pink); }
+.rot-weekly .rot-head span:first-child { color: var(--gold); }
+.rot-daily .rot-head span:first-child { color: var(--cyan); }
+.rot-timer { font-size: 10px; opacity: 0.8; }
+
+.rot-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.rot-card {
+  flex: 1 1 150px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.rot-owned { opacity: 0.55; }
+.rot-name { font-size: 12px; font-weight: 600; }
+.rot-price {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.rot-price s { color: var(--text-dim); font-size: 11px; }
+.rot-price b { color: var(--gold); }
+.rot-off {
+  background: var(--pink);
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+}
+
+/* =========================================================
+   GLOBAL COUNTERS PANEL
+   ========================================================= */
+.global-panel {
+  width: 100%;
+  max-width: 1000px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 0 auto 18px;
+}
+.global-head {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.global-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+.global-cell {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.global-icon { font-size: 14px; }
+.global-cell b {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  color: var(--cyan);
+}
+.global-cell i {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.global-busiest {
+  margin-top: 11px;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+.global-busiest b { color: var(--gold); }
+.rot-owned-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cyan);
+  text-align: center;
+  padding: 7px 0;
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+}

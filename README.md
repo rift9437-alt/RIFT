@@ -160,12 +160,18 @@ public/
     games.css             per-cabinet styling
     companions.css        the theme companion characters
     ui.css                leaderboard, chat, admin, shared HUD
+    clans.css             clans and bug reports
+    shop-rotation.css     rotating shop slots, arcade totals
+    gazette.css           the Gazette, the archive, tournaments
+    avatar.css            the avatar creator
+    multiplayer.css       room lobby and seats
   js/
     core/                 auth, screens, leaderboard, currency, sfx,
                           settings, sprites, mini3d, pause, init
     features/             chat, shop, achievements, daily, community,
                           profile, crates, party, builder, admin, ...
-    games/                one file per cabinet (29 of them)
+    games/                one file per cabinet (29), plus the two
+                          multiplayer worlds (hub, kart)
 ```
 
 The scripts are plain (non-module) files loaded in order, exactly as they ran
