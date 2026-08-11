@@ -25,7 +25,7 @@ function nameplate(user){
   const avatar = w.avatar || '';
   const title = (w.titles && w.titles.length) ? w.titles[w.titles.length - 1] : '';
   const badges = badgesFor(user).map(b =>
-    `<span class="chat-badge" style="color:${b.color}; border-color:${b.color}55" title="${escapeHtml(b.title)}">${b.icon}</span>`).join('');
+    `<span class="flair-badge" style="color:${b.color}; border-color:${b.color}55" title="${escapeHtml(b.title)}">${b.icon}</span>`).join('');
   return `<span class="nameplate">` +
     (avatar ? `<span class="np-avatar">${avatar}</span>` : '') +
     `<span class="np-name">${escapeHtml(user)}</span>` +

@@ -7,7 +7,17 @@
     --cyan:#2de2c5;
     --gold:#ffc857;
     --text:#e8ecf1;
-    --text-dim:#7c8699;
+    /* Derived from --text rather than fixed, so a theme that swaps the text
+       colour gets a muted version of *its* text instead of a grey chosen for
+       the default palette — which is how #7c8699 ended up at 2:1 on
+       Beachwave's panels. A theme can still override it outright. */
+    --text-dim:color-mix(in srgb, var(--text) 62%, var(--bg-panel));
+    /* Text drawn ON an accent colour — a primary button, a chat badge, the TV
+       tag. It can't be a fixed near-black: the light themes (Goose, Zip) use
+       dark accents, and dark-on-dark is unreadable. The panel colour is always
+       the tonal opposite of the accents in a coherent theme, so borrowing it
+       inverts by itself when a theme flips light. */
+    --on-accent:var(--bg-panel);
     --font-display:'Press Start 2P', monospace;
     --font-body:'Space Grotesk', sans-serif;
     --font-mono:'JetBrains Mono', monospace;
@@ -151,7 +161,7 @@
   .btn:active{transform:translateY(1px) scale(0.98);}
   .btn-primary{
     background:var(--btn-gradient, linear-gradient(135deg, var(--cyan), #1bb89e));
-    color:#04140f;
+    color:var(--on-accent);
     width:100%;
     margin-top:22px;
     box-shadow:0 0 18px rgba(45,226,197,0.35);
@@ -165,7 +175,7 @@
   .btn-secondary:hover{border-color:var(--cyan); color:var(--cyan);}
   .btn-pink{
     background:linear-gradient(135deg, var(--pink), #c92469);
-    color:#180410;
+    color:var(--on-accent);
     box-shadow:0 0 18px rgba(255,61,138,0.35);
   }
   .btn-pink:hover{box-shadow:0 0 26px rgba(255,61,138,0.55);}

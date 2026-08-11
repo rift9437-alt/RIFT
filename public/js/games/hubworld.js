@@ -177,7 +177,7 @@ const HubWorld = (function(){
     }
 
     // jump + gravity
-    if((keys.has(' ') || keys.has('space')) && me.y <= 0.001){
+    if(keys.has('space') && me.y <= 0.001){
       me.vy = JUMP;
       Sfx.play('click');
     }

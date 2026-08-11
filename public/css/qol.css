@@ -59,7 +59,7 @@
   font-family:var(--font-mono);
   font-size:8px;
   letter-spacing:1px;
-  color:var(--gold);
+  color:var(--cab-accent, var(--gold));
   text-transform:uppercase;
 }
 .cabinet-recent-badge{
@@ -69,7 +69,7 @@
   font-family:var(--font-mono);
   font-size:8px;
   letter-spacing:1px;
-  color:var(--text-dim);
+  color:var(--cab-fg-dim, var(--text-dim));
   text-transform:uppercase;
 }
 
@@ -116,7 +116,10 @@
   align-items:center;
   gap:18px;
   flex-wrap:wrap;
-  background:linear-gradient(135deg, rgba(255,61,138,0.10), rgba(45,226,197,0.04));
+  /* The tint goes over the panel colour, not over the page. On its own it's
+     transparent, so under a theme with its own body gradient this panel
+     inherited whatever the page happened to be and its text stopped reading. */
+  background:linear-gradient(135deg, rgba(255,61,138,0.10), rgba(45,226,197,0.04)), var(--bg-panel);
   border:1px solid var(--border);
   border-left:3px solid var(--pink);
   border-radius:12px;
@@ -161,7 +164,7 @@
   font-family:var(--font-display);
   font-size:9px;
   letter-spacing:1px;
-  color:#04140f;
+  color:var(--on-accent);
   background:var(--cyan);
   padding:5px 8px;
   border-radius:4px;
@@ -170,10 +173,10 @@
 .tv-body{
   font-family:var(--font-mono);
   font-size:13px;
-  color:var(--text);
+  color:#e8ecf1;
   animation:tv-in .4s ease-out;
 }
-.tv-sub{font-size:10.5px; color:var(--text-dim); margin-top:3px;}
+.tv-sub{font-size:10.5px; color:rgba(232,236,241,0.6); margin-top:3px;}
 @keyframes tv-in{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
 
 /* ---------- result overlay extras ---------- */
@@ -334,7 +337,10 @@ body.glitching .dash-content{animation:glitch-shift .5s steps(2) 2;}
   font-family:var(--font-mono); font-size:8px; letter-spacing:1px; text-transform:uppercase;
   color:var(--gold); border:1px solid rgba(255,200,87,0.4); border-radius:3px; padding:1px 4px;
 }
-.chat-badge{
+/* Flair worn next to a name in chat. Named for what it is — it used to be
+   `.chat-badge`, which is also the unread-count pill in ui.css, and since
+   this file loads later it was flattening that pill into a bordered box. */
+.flair-badge{
   font-size:10px; border:1px solid var(--border); border-radius:3px; padding:0 3px;
 }
 

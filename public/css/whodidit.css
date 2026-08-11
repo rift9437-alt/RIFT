@@ -58,7 +58,7 @@
 }
 .wdi-btn.done::after {
   content: ' ✓';
-  color: var(--lime);
+  color: var(--cyan);
 }
 
 .wdi-accuse {

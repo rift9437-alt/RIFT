@@ -38,9 +38,12 @@ body.season-2::after  { right: 0; transform: scaleX(-1); }
 body.season-2:has(.game-screen:not(.hidden))::before,
 body.season-2:has(.game-screen:not(.hidden))::after { display: none; }
 
-/* The dashboard title gets a flicker, like the sign is going. */
+/* The dashboard title gets a flicker, like the sign is going. The colour
+   comes from the theme rather than a fixed pumpkin orange: on the light
+   themes (Goose, Zip) that orange sat at 1.7:1 and the title vanished. The
+   glow keeps the Halloween read on the dark ones. */
 body.season-2 .dash-title {
-  color: #ff7518;
+  color: var(--gold);
   text-shadow: 0 0 12px rgba(255, 117, 24, 0.55);
   animation: season2-flicker 6s infinite steps(1, end);
 }

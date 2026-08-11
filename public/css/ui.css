@@ -111,7 +111,7 @@
     overflow-y:auto;
   }
   .admin-section{
-    border-top:1px solid var(--line);
+    border-top:1px solid var(--border);
     margin:16px 0 12px;
     padding-top:12px;
   }
@@ -308,7 +308,7 @@
   .chat-toggle:hover{border-color:var(--cyan); box-shadow:0 8px 26px rgba(0,0,0,0.6), 0 0 14px rgba(45,226,197,0.25);}
   .chat-badge{
     background:var(--pink);
-    color:#180410;
+    color:var(--on-accent);
     font-size:10px;
     font-weight:700;
     min-width:18px;
@@ -415,7 +415,7 @@
   }
   .chat-send{
     background:linear-gradient(135deg, var(--cyan), #1bb89e);
-    color:#04140f;
+    color:var(--on-accent);
     border:none;
     border-radius:6px;
     font-family:var(--font-mono);
@@ -502,24 +502,19 @@ html.theme-image-active .icon-btn,
 html.theme-image-active .shop-buy-btn,
 html.theme-image-active .cabinet-card,
 html.theme-image-active .toggle{
-  background-image: var(--theme-image) !important;
-  background-size: cover !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
+  /* The scrim is a background layer over the photo, not a pseudo-element.
+     It used to be a ::before at z-index:-1, which put it behind the button's
+     own background where it did nothing at all — leaving white labels on a
+     mostly-white goose at about 1.1:1. */
+  background-image:
+    linear-gradient(rgba(0,0,0,0.52), rgba(0,0,0,0.52)),
+    var(--theme-image) !important;
+  background-size: cover, cover !important;
+  background-position: center, center !important;
+  background-repeat: no-repeat, no-repeat !important;
   color: #ffffff !important;
   text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.7);
   position: relative;
-}
-html.theme-image-active .btn-primary::before,
-html.theme-image-active .btn-secondary::before,
-html.theme-image-active button::before,
-html.theme-image-active .icon-btn::before{
-  content:'';
-  position:absolute; inset:0;
-  background: rgba(0,0,0,0.28);
-  border-radius: inherit;
-  pointer-events:none;
-  z-index: -1;
 }
 
 /* =========================================================

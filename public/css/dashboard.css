@@ -7,7 +7,9 @@
     align-items:center;
     padding:18px 28px;
     border-bottom:1px solid var(--border);
-    background:rgba(18,22,31,0.6);
+    /* Follows the theme rather than being a fixed dark wash — under a light
+       theme the old value put dim text on a grey band. */
+    background:var(--bg-panel);
     position:sticky;
     top:0;
     z-index:50;
@@ -22,7 +24,17 @@
     text-shadow:0 0 8px rgba(45,226,197,0.6);
   }
   .topbar-logo span{color:var(--pink); text-shadow:0 0 8px rgba(255,61,138,0.6);}
-  .topbar-right{display:flex; align-items:center; gap:14px;}
+  /* The bar carries a dozen controls, so it has to be allowed to break onto a
+     second row — .topbar wraps but this row didn't, which put ~690px of the
+     dashboard off the right of a phone screen. */
+  .topbar-right{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    flex-wrap:wrap;
+    gap:14px;
+    min-width:0;
+  }
   .user-badge{
     font-family:var(--font-mono);
     font-size:12px;
@@ -51,6 +63,15 @@
     transition:all .15s;
   }
   .shop-btn:hover{background:rgba(255,200,87,0.12); box-shadow:0 0 10px rgba(255,200,87,0.35);}
+
+  /* On a narrow screen the bar becomes a couple of tidy rows rather than one
+     long one nobody can reach the end of. */
+  @media (max-width:760px){
+    .topbar{padding:12px 14px; gap:8px;}
+    .topbar-right{gap:8px; width:100%; justify-content:flex-start;}
+    .shop-btn{font-size:10px; letter-spacing:1px; padding:7px 10px;}
+    .user-badge{font-size:10px; letter-spacing:0.5px;}
+  }
 
   .shop-wrap{width:100%; max-width:640px;}
   .shop-balance-row{

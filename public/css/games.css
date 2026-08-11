@@ -75,6 +75,13 @@
     gap:18px;
   }
   .cabinet{
+    /* A theme may give its cabinets a palette of their own — Zip's page is
+       near-white but its cabinets are dark green. Everything inside a card
+       therefore has to colour itself against the card, not against the page,
+       or a darkened page accent lands on a dark card and disappears. */
+    --cab-fg:var(--cabinet-text, var(--text));
+    --cab-fg-dim:var(--cabinet-text-dim, var(--text-dim));
+    --cab-accent:var(--cabinet-text, var(--gold));
     background:var(--cabinet-bg, var(--bg-panel));
     border:1px solid var(--border);
     border-radius:12px;
@@ -103,10 +110,10 @@
     font-weight:700;
     font-size:17px;
     margin-bottom:4px;
-    color:var(--cabinet-text, var(--text));
+    color:var(--cab-fg);
   }
   .cabinet-desc{
-    color:var(--cabinet-text-dim, var(--text-dim));
+    color:var(--cab-fg-dim);
     font-size:12.5px;
     line-height:1.5;
     margin-bottom:14px;
@@ -116,7 +123,12 @@
     font-family:var(--font-mono);
     font-size:10.5px;
     letter-spacing:1px;
-    color:var(--accent-c, var(--cyan));
+    /* Each cabinet carries a brand colour, all of them picked against the
+       default dark card. Pulled a third of the way toward the card's own text
+       so the line stays legible on any card a theme hands it — the accent is
+       still what you see, and the undiluted colour is right there in the bar
+       across the top of the card and the hover border. */
+    color:color-mix(in srgb, var(--accent-c, var(--cyan)) 65%, var(--cab-fg));
     text-transform:uppercase;
   }
   .cabinet-leader{
@@ -124,7 +136,7 @@
     border-color:rgba(255,200,87,0.35);
   }
   .cabinet-leader::after{background:var(--gold);}
-  .cabinet-leader .cabinet-stat{color:var(--gold);}
+  .cabinet-leader .cabinet-stat{color:var(--cab-accent);}
 
   /* ---------- cabinet tags / personal best / filters ---------- */
   .cabinet-tags{
@@ -141,17 +153,19 @@
     padding:3px 7px;
     border-radius:4px;
     border:1px solid var(--border);
-    color:var(--text-dim);
+    color:var(--cab-fg-dim);
     background:rgba(255,255,255,0.02);
   }
-  .cab-tag-3d{color:#a78bff; border-color:rgba(167,139,255,0.45); background:rgba(167,139,255,0.1);}
-  .cab-tag-new{color:var(--gold); border-color:rgba(255,200,87,0.5); background:rgba(255,200,87,0.1);}
-  .cab-tag-versus{color:var(--pink); border-color:rgba(255,61,138,0.4);}
+  /* The tinted border and fill carry which tag this is; the label itself
+     stays on the card's own text colour so it can't vanish into it. */
+  .cab-tag-3d{color:var(--cabinet-text, #a78bff); border-color:rgba(167,139,255,0.45); background:rgba(167,139,255,0.1);}
+  .cab-tag-new{color:var(--cab-accent); border-color:rgba(255,200,87,0.5); background:rgba(255,200,87,0.1);}
+  .cab-tag-versus{color:var(--cabinet-text, var(--pink)); border-color:rgba(255,61,138,0.4);}
   .cabinet-best{
     font-family:var(--font-mono);
     font-size:10.5px;
     letter-spacing:1px;
-    color:var(--gold);
+    color:var(--cab-accent);
     text-transform:uppercase;
     margin-top:4px;
     min-height:14px;
@@ -243,8 +257,6 @@
   .toggle.on{border-color:var(--cyan); background:rgba(45,226,197,0.15);}
   .toggle.on::after{transform:translateX(22px); background:var(--cyan);}
   body.no-scanlines .scanlines{display:none;}
-  .cabinet-leader .cabinet-stat{color:var(--gold);}
-
 
   /* ---------- generic game screen scaffolding ---------- */
   .game-screen{align-items:center;}
