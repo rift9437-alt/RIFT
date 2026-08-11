@@ -134,7 +134,7 @@ const CABINETS = [
     tags:[], screen:'party-screen',
     stat:'Multiplayer rooms', onOpen:()=>openPartyLobby() },
   { id:'multiplayer', icon:'🎮', name:'Play Together', accent:'#ff3d8a',
-    desc:"Rooms you and your friends actually share. Hang out in The Hub as your avatar, or line up for a three-lap race in Rift Kart.",
+    desc:"Rooms you and your friends actually share. Hang out in The Hub as your avatar, or line up for three laps of Rift Kart — drift for a mini-turbo, grab an item box, and hope the shell behind you is aimed at somebody else.",
     tags:['versus','new'], screen:'mp-screen',
     stat:'Live rooms · Up to 8 players', onOpen:()=>openMultiplayer() },
   { id:'avatar', icon:'🧍', name:'Your Avatar', accent:'#45ffb0',

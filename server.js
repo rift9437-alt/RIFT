@@ -4595,6 +4595,12 @@ function mpBroadcastRoom(room, type, payload){
   broadcastEvent(type, payload, user => members.has(user));
 }
 
+// One player only. What came out of an item box is theirs to know — telling
+// the room would let everyone see the leader is holding a shell.
+function mpSendTo(user, type, payload){
+  broadcastEvent(type, payload, u => u === user);
+}
+
 // The same centreline the client draws. Kept here because the server already
 // judges checkpoints against it — a start grid placed by a different curve
 // would drop everyone into the infield, which is exactly what it did before
@@ -4612,6 +4618,129 @@ function kartTrackYaw(t){
   return Math.atan2(b.x - a.x, b.z - a.z);
 }
 
+// ---------------------------------------------------------------------------
+// Kart items
+// ---------------------------------------------------------------------------
+// The whole item layer is decided here rather than on the client, because
+// every part of it is something a player would want to lie about: which box
+// they picked up, what came out of it, and whether a shell hit them. Clients
+// still own their own position — that was already true — so the server checks
+// pickups and hits against the positions it is being told, which is the same
+// trust it already extends to lap counting.
+const KART_BOX_STATIONS = 6;        // rows of boxes around the circuit
+const KART_BOX_LANES = [-2.6, 0, 2.6];
+const KART_BOX_RESPAWN_MS = 6000;
+const KART_BOX_RADIUS = 3.0;
+const KART_HAZARD_RADIUS = 2.0;
+const KART_SPIN_MS = 1500;
+const KART_SHIELD_MS = 14000;
+const KART_SHELL_SPEED = 30;        // world units per second
+const KART_MAX_HAZARDS = 24;
+
+const KART_ITEMS = {
+  boost:  { icon: '🍄', name: 'Turbo Cap' },
+  banana: { icon: '🍌', name: 'Banana' },
+  shell:  { icon: '🐢', name: 'Homing Shell' },
+  bolt:   { icon: '⚡', name: 'Rift Bolt' },
+  shield: { icon: '🛡', name: 'Shield' }
+};
+
+// Weighted by where you are in the race, so the front of the grid gets
+// defensive junk and the back gets something that can win them a place. A
+// leader who rolls a bolt has already won.
+function rollKartItem(place, total){
+  const frac = total > 1 ? (place - 1) / (total - 1) : 0.5;
+  const weights = {
+    boost:  1 + frac * 4,
+    banana: 3 - frac * 2,
+    shell:  1 + frac * 3,
+    bolt:   frac > 0.55 ? (frac - 0.55) * 8 : 0,
+    shield: 2.2 - frac * 1.2
+  };
+  const total_w = Object.values(weights).reduce((a, b) => a + b, 0);
+  let r = Math.random() * total_w;
+  for(const [id, w] of Object.entries(weights)){
+    r -= w;
+    if(r <= 0) return id;
+  }
+  return 'banana';
+}
+
+function kartBoxes(){
+  const out = [];
+  for(let s = 0; s < KART_BOX_STATIONS; s++){
+    const t = (s + 0.5) / KART_BOX_STATIONS;
+    const p = kartTrackPoint(t);
+    const yaw = kartTrackYaw(t);
+    const sx = Math.cos(yaw), sz = -Math.sin(yaw);
+    KART_BOX_LANES.forEach(lane => {
+      out.push({ x: p.x + sx * lane, z: p.z + sz * lane, takenAt: 0 });
+    });
+  }
+  return out;
+}
+
+// Running order, best first. Checkpoint count already folds in laps, so it's
+// the one number that orders the field.
+function kartOrder(room){
+  return [...room.players.values()].sort((a, b) => b.checkpoint - a.checkpoint);
+}
+
+function kartPlaceOf(room, user){
+  return kartOrder(room).findIndex(p => p.user === user) + 1;
+}
+
+function kartStrike(room, p, by){
+  const now = Date.now();
+  if(p.finished) return;
+  if(p.shieldUntil > now){
+    p.shieldUntil = 0;
+    mpBroadcastRoom(room, 'mp:kart-block', { user: p.user });
+    return;
+  }
+  p.spunUntil = now + KART_SPIN_MS;
+  mpBroadcastRoom(room, 'mp:kart-hit', { user: p.user, by: by || null });
+}
+
+// Everything that has to happen on a clock — boxes coming back, shells
+// landing, players driving into things — resolved once per relay tick.
+function kartTick(room, now){
+  if(room.mode !== 'kart' || !room.started) return;
+  if(!room.boxes) room.boxes = kartBoxes();
+
+  for(const p of room.players.values()){
+    if(p.finished) continue;
+    if(!p.item){
+      for(const box of room.boxes){
+        if(box.takenAt && now - box.takenAt < KART_BOX_RESPAWN_MS) continue;
+        if(Math.hypot(box.x - p.x, box.z - p.z) > KART_BOX_RADIUS) continue;
+        box.takenAt = now;
+        p.item = rollKartItem(kartPlaceOf(room, p.user), room.players.size);
+        mpSendTo(p.user, 'mp:kart-item', { item: p.item });
+        break;
+      }
+    }
+    // Bananas, including your own — dropping one under your own wheels is a
+    // mistake the game should let you make.
+    for(let i = room.hazards.length - 1; i >= 0; i--){
+      const h = room.hazards[i];
+      if(now - h.at < 400 && h.owner === p.user) continue;  // clear your own drop
+      if(Math.hypot(h.x - p.x, h.z - p.z) > KART_HAZARD_RADIUS) continue;
+      room.hazards.splice(i, 1);
+      kartStrike(room, p, h.owner);
+      break;
+    }
+  }
+
+  for(let i = room.shells.length - 1; i >= 0; i--){
+    const s = room.shells[i];
+    if(now < s.hitAt) continue;
+    room.shells.splice(i, 1);
+    const target = room.players.get(s.to);
+    if(target) kartStrike(room, target, s.from);
+  }
+}
+
 function mpFreshPlayer(user, mode){
   // Spawn positions are spread around a circle so nobody starts inside
   // somebody else.
@@ -4621,6 +4750,7 @@ function mpFreshPlayer(user, mode){
     vx: 0, vz: 0,
     phase: 0, moving: false,
     lap: 0, checkpoint: 0, finished: 0,
+    item: null, spunUntil: 0, shieldUntil: 0,
     emote: null, emoteAt: 0,
     lastInputAt: Date.now()
   };
@@ -4647,6 +4777,7 @@ function mpSpawn(room, player, index){
     player.yaw = -a;
   }
   player.lap = 0; player.checkpoint = 0; player.finished = 0;
+  player.item = null; player.spunUntil = 0; player.shieldUntil = 0;
 }
 
 // Rooms nobody has touched in half an hour are cleaned up, so a forgotten
@@ -4676,6 +4807,9 @@ app.post('/api/mp/create', async (req, res) => {
     started: false,
     startedAt: 0,
     players: new Map(),
+    boxes: mode === 'kart' ? kartBoxes() : null,
+    hazards: [],
+    shells: [],
     touchedAt: Date.now()
   };
   const p = mpFreshPlayer(user, mode);
@@ -4736,6 +4870,9 @@ app.post('/api/mp/start', async (req, res) => {
     if(room.host !== user) return res.status(403).json({ error: 'Only the host can start.' });
     room.started = true;
     room.startedAt = Date.now() + 3000;   // a shared countdown everyone sees
+    room.boxes = room.mode === 'kart' ? kartBoxes() : null;
+    room.hazards = [];
+    room.shells = [];
     let i = 0;
     for(const p of room.players.values()){ mpSpawn(room, p, i++); p.ready = false; }
     room.touchedAt = Date.now();
@@ -4878,6 +5015,61 @@ wss.on('connection', ws => {
       return;
     }
 
+    // Firing whatever you picked up. The client says "use it" and nothing
+    // more — which item you're holding, who it hits and whether it lands are
+    // all read from state the server already owns.
+    if (msg.type === 'mp:kart-use') {
+      const room = mpRoomOf(ws.username);
+      if (!room || room.mode !== 'kart' || !room.started) return;
+      const p = room.players.get(ws.username);
+      if (!p || !p.item || p.finished) return;
+      const now = Date.now();
+      if (p.spunUntil > now) return;     // no firing mid-spin
+      const item = p.item;
+      p.item = null;
+
+      if (item === 'boost') {
+        mpBroadcastRoom(room, 'mp:kart-boost', { user: p.user });
+      } else if (item === 'shield') {
+        p.shieldUntil = now + KART_SHIELD_MS;
+        mpBroadcastRoom(room, 'mp:kart-shield', { user: p.user, until: p.shieldUntil });
+      } else if (item === 'banana') {
+        // Dropped just behind the kart, where you'd expect to leave it.
+        if (room.hazards.length >= KART_MAX_HAZARDS) room.hazards.shift();
+        const h = {
+          x: p.x - Math.sin(p.yaw) * 2.4,
+          z: p.z - Math.cos(p.yaw) * 2.4,
+          owner: p.user, at: now
+        };
+        room.hazards.push(h);
+        mpBroadcastRoom(room, 'mp:kart-drop', { x: h.x, z: h.z });
+      } else if (item === 'shell') {
+        // Locks onto whoever is directly ahead. Nobody ahead means it's
+        // wasted, which is the cost of holding one while you lead.
+        const order = kartOrder(room);
+        const mine = order.findIndex(q => q.user === p.user);
+        const target = mine > 0 ? order[mine - 1] : null;
+        if (target) {
+          const dist = Math.hypot(target.x - p.x, target.z - p.z);
+          const ms = Math.max(350, Math.min(4000, (dist / KART_SHELL_SPEED) * 1000));
+          room.shells.push({ from: p.user, to: target.user, hitAt: now + ms });
+          mpBroadcastRoom(room, 'mp:kart-shell', { from: p.user, to: target.user, ms });
+        } else {
+          mpSendTo(p.user, 'mp:kart-fizzle', { item });
+        }
+      } else if (item === 'bolt') {
+        // Everyone ahead of you, all at once.
+        const order = kartOrder(room);
+        const mine = order.findIndex(q => q.user === p.user);
+        const hit = order.slice(0, Math.max(0, mine));
+        hit.forEach(q => kartStrike(room, q, p.user));
+        mpBroadcastRoom(room, 'mp:kart-bolt', { by: p.user, hit: hit.map(q => q.user) });
+        if (!hit.length) mpSendTo(p.user, 'mp:kart-fizzle', { item });
+      }
+      room.touchedAt = now;
+      return;
+    }
+
     if (msg.type === 'mp:emote') {
       const room = mpRoomOf(ws.username);
       if (!room) return;
@@ -4956,6 +5148,8 @@ setInterval(() => {
       mpBroadcastRoom(room, 'mp:room', mpPublic(room));
     }
 
+    kartTick(room, now);
+
     const players = [...room.players.values()].map(p => ({
       u: p.user,
       x: Math.round(p.x * 100) / 100,
@@ -4966,11 +5160,22 @@ setInterval(() => {
       m: p.moving ? 1 : 0,
       l: p.lap,
       f: p.finished ? 1 : 0,
+      k: p.spunUntil > now ? 1 : 0,
+      s: p.shieldUntil > now ? 1 : 0,
       e: (p.emote && now - p.emoteAt < 2500) ? p.emote : null
     }));
-    mpBroadcastRoom(room, 'mp:state', {
-      code: room.code, t: now, startsAt: room.startedAt, players
-    });
+    const payload = { code: room.code, t: now, startsAt: room.startedAt, players };
+    if(room.mode === 'kart' && room.started){
+      // Which boxes are back, as a bitmask — 18 booleans 17 times a second is
+      // worth one number rather than an array.
+      let live = 0;
+      (room.boxes || []).forEach((b, i) => {
+        if(!b.takenAt || now - b.takenAt >= KART_BOX_RESPAWN_MS) live |= (1 << i);
+      });
+      payload.bx = live;
+      payload.hz = room.hazards.map(h => [Math.round(h.x*10)/10, Math.round(h.z*10)/10]);
+    }
+    mpBroadcastRoom(room, 'mp:state', payload);
   }
 }, MP_TICK_MS).unref();
 

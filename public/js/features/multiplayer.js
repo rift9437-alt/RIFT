@@ -14,6 +14,11 @@ let mpPlayers = new Map();    // user -> { x,y,z,yaw, tx,ty,tz,tyaw, phase, movi
 let mpStartsAt = 0;
 let mpFinishOrder = [];
 let mpSendTimer = null;
+// Kart item state, all of it the server's word. The client draws these and
+// never decides them — see the kart item block in server.js.
+let mpBoxMask = 0;            // bit per item box: 1 = on the track right now
+let mpHazards = [];           // [[x,z], …] bananas lying about
+let mpShells = [];            // shells in flight, purely for the animation
 
 const MP_SEND_MS = 60;        // how often we tell the server where we are
 const MP_LERP = 0.22;         // how hard remote players chase their target
@@ -57,7 +62,7 @@ function renderMpLobby(){
         <input id="mp-name" maxlength="28" class="clan-input" placeholder="Room name">
         <select id="mp-mode" class="clan-input">
           <option value="world">🌍 The Hub — hang out</option>
-          <option value="kart">🏎 Rift Kart — race</option>
+          <option value="kart">🏎 Rift Kart — race with items</option>
         </select>
       </div>
       <label class="mp-check">
@@ -323,6 +328,8 @@ Realtime.on('mp:state', payload => {
       }
       me.lap = s.l;
       me.finished = s.f;
+      me.spun = !!s.k;
+      me.shield = !!s.s;
       return;
     }
     let p = mpPlayers.get(s.u);
@@ -334,8 +341,12 @@ Realtime.on('mp:state', payload => {
     p.moving = !!s.m;
     p.lap = s.l;
     p.finished = s.f;
+    p.spun = !!s.k;
+    p.shield = !!s.s;
     p.emote = s.e;
   });
+  if(typeof payload.bx === 'number') mpBoxMask = payload.bx;
+  if(payload.hz) mpHazards = payload.hz;
   // Anyone missing from the snapshot has left.
   [...mpPlayers.keys()].forEach(u => {
     if(u !== currentUser && !seen.has(u)) mpPlayers.delete(u);
@@ -355,6 +366,46 @@ Realtime.on('mp:finish', payload => {
 Realtime.on('mp:emote', payload => {
   const p = mpPlayers.get(payload.user);
   if(p){ p.emote = payload.emote; }
+});
+
+/* ---- kart items ------------------------------------------------------
+   Every one of these is the server telling us what happened. The kart reads
+   them to draw and to react; it never decides any of it itself. */
+
+Realtime.on('mp:kart-item', payload => KartGame.gotItem(payload.item));
+Realtime.on('mp:kart-fizzle', () => KartGame.fizzled());
+
+Realtime.on('mp:kart-boost', payload => {
+  if(payload.user === currentUser) KartGame.itemBoost();
+});
+
+Realtime.on('mp:kart-shield', payload => {
+  if(payload.user === currentUser) toast('Shield up', 'The next hit bounces off', '🛡', 'cyan');
+});
+
+Realtime.on('mp:kart-drop', payload => {
+  // The banana itself arrives in the next state snapshot; this is the sound
+  // and the puff of dust at the moment it lands.
+  KartGame.droppedNearby(payload.x, payload.z);
+});
+
+Realtime.on('mp:kart-shell', payload => {
+  mpShells.push({ from: payload.from, to: payload.to, at: Date.now(), ms: payload.ms });
+  if(payload.to === currentUser) toast('Incoming', `${payload.from} fired a shell`, '🐢', 'pink');
+});
+
+Realtime.on('mp:kart-hit', payload => {
+  mpShells = mpShells.filter(s => s.to !== payload.user);
+  KartGame.struck(payload.user, payload.by);
+});
+
+Realtime.on('mp:kart-block', payload => {
+  if(payload.user === currentUser) toast('Blocked', 'Your shield took it', '🛡', 'gold');
+});
+
+Realtime.on('mp:kart-bolt', payload => {
+  if(payload.by === currentUser) toast('Rift Bolt', `Caught ${payload.hit.length} ahead of you`, '⚡', 'gold');
+  else if(payload.hit.includes(currentUser)) toast('Rift Bolt', `${payload.by} hit the whole field`, '⚡', 'pink');
 });
 
 Realtime.on('avatar', payload => {

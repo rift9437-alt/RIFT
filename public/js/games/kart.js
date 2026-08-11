@@ -44,6 +44,18 @@ const KartGame = (function(){
   const BOOST_KICK = [1.20, 1.38];// multiple of MAX_SPEED applied instantly
   const BOOST_CAP = 1.45;         // ceiling while a boost is live
 
+  // Items. The layout has to match the server's kartBoxes() exactly, because
+  // the server decides who picked up what by comparing positions — a box drawn
+  // somewhere else is a box you can't collect. Everything else about items
+  // (what's in a box, whether a shell landed) is the server's call; this file
+  // only draws it and asks.
+  const BOX_STATIONS = 6;
+  const BOX_LANES = [-2.6, 0, 2.6];
+  const ITEM_ICONS = { boost:'🍄', banana:'🍌', shell:'🐢', bolt:'⚡', shield:'🛡' };
+  const ITEM_NAMES = { boost:'Turbo Cap', banana:'Banana', shell:'Homing Shell',
+                       bolt:'Rift Bolt', shield:'Shield' };
+  const SPIN_MS = 1500;
+
   // The circuit centreline. Checkpoints are evenly spaced around it, and the
   // road is drawn as quads between consecutive points.
   const TRACK_R = 30;
@@ -58,6 +70,7 @@ const KartGame = (function(){
   let raceStart = 0, lastLapAt = 0, bestLap = 0;
   let drift = 0, driftDir = 0, boost = 0, boostPads = [];
   let lapTimes = [];
+  let itemBoxes = [], myItem = null, spinUntil = 0, itemFlash = 0, canFire = false;
 
   // A closed loop with a couple of kinks, so it isn't a plain circle.
   function trackPoint(t){
@@ -172,6 +185,27 @@ const KartGame = (function(){
     return centre[Math.round((i / CHECKPOINTS) * NODES) % NODES];
   }
 
+  // Heading along the circuit at t, matching the server's kartTrackYaw.
+  function trackYaw(t){
+    const a = trackPoint(t), b = trackPoint(t + 0.002);
+    return Math.atan2(b.x - a.x, b.z - a.z);
+  }
+
+  // Rows of item boxes across the road. Built once and in the same order as
+  // the server, since the state snapshot identifies them by index.
+  function buildItemBoxes(){
+    itemBoxes = [];
+    for(let s = 0; s < BOX_STATIONS; s++){
+      const t = (s + 0.5) / BOX_STATIONS;
+      const p = trackPoint(t);
+      const yaw = trackYaw(t);
+      const sx = Math.cos(yaw), sz = -Math.sin(yaw);
+      BOX_LANES.forEach(lane => {
+        itemBoxes.push({ x: p.x + sx * lane, z: p.z + sz * lane });
+      });
+    }
+  }
+
   // How far off the centreline we are, used to slow you down on the grass.
   function distanceToTrack(x, z){
     let best = Infinity;
@@ -210,11 +244,53 @@ const KartGame = (function(){
     lapTimes = [];
     myCheckpoint = 0; myLap = 0; finished = false;
     bestLap = 0; lastLapAt = 0;
+    myItem = null; spinUntil = 0; itemFlash = 0; canFire = true;
+    mpHazards = []; mpShells = []; mpBoxMask = 0;
     // Position comes from the server's grid — see needsSpawn in
     // multiplayer.js — so nothing here touches x/z/yaw.
     me.phase = 0; me.moving = false;
     camYaw = me.yaw;
     frame = 0;
+  }
+
+  /* ---- items ----------------------------------------------------------
+     Called from the socket handlers in multiplayer.js. Not one of these
+     decides anything — they're the server's word arriving, and the kart's job
+     is to make it visible. */
+
+  function gotItem(item){
+    myItem = item;
+    itemFlash = 40;
+    Sfx.play('coin', 1.2);
+    if(typeof toast === 'function'){
+      toast(ITEM_NAMES[item] || 'Item', 'SPACE to use it', ITEM_ICONS[item] || '🎁', 'gold');
+    }
+  }
+
+  function fizzled(){
+    // A shell or a bolt with nobody ahead. You still spent it.
+    if(typeof toast === 'function') toast('Nothing ahead', 'Wasted', '💨', 'cyan');
+  }
+
+  function itemBoost(){
+    applyBoost(1);
+  }
+
+  function droppedNearby(x, z){
+    const me = mpLocal();
+    if(Math.hypot(x - me.x, z - me.z) < 40) Sfx.play('click', 0.8);
+  }
+
+  function struck(user, by){
+    if(user === currentUser){
+      spinUntil = Date.now() + SPIN_MS;
+      Sfx.play('lose', 1.2);
+      if(typeof toast === 'function'){
+        toast('Spun out', by ? `${by} got you` : 'You hit something', '💥', 'pink');
+      }
+    } else {
+      Sfx.play('hit', 0.7);
+    }
   }
 
   // Cashing in a slide. Two tiers, so a long committed drift out of a hairpin
@@ -245,7 +321,19 @@ const KartGame = (function(){
   function update(){
     frame++;
     const me = mpLocal();
-    const locked = countdownLeft() > 0 || finished;
+    if(itemFlash > 0) itemFlash--;
+
+    // Spun out. The server decides this — being hit is not something a client
+    // gets a say in — but the local clock runs it out so the spin starts on
+    // impact rather than on the next 17Hz snapshot.
+    const spinning = Date.now() < spinUntil || me.spun;
+    const locked = countdownLeft() > 0 || finished || spinning;
+
+    if(spinning){
+      me.yaw += 0.30;
+      speed *= 0.88;
+      drift = 0; boost = 0;
+    }
 
     if(!locked){
       if(keys.has('w') || keys.has('arrowup')) speed += ACCEL;
@@ -281,6 +369,8 @@ const KartGame = (function(){
     const cap = boost > 0 ? MAX_SPEED * BOOST_CAP : MAX_SPEED;
     speed = Math.max(-MAX_SPEED*0.4, Math.min(cap, speed));
     if(locked) speed *= 0.9;
+
+    canFire = !spinning;
 
     // Boost pads
     if(!locked){
@@ -324,6 +414,9 @@ const KartGame = (function(){
           lastLapAt = now;
           if(myLap >= LAPS){
             finished = true;
+            // Nothing left to use it on, and an item still showing in the
+            // slot invites a press that quietly does nothing.
+            myItem = null;
             Sfx.play('win');
             showKartResults();
           } else {
@@ -360,7 +453,7 @@ const KartGame = (function(){
       groundNear: '#123021', groundFar: '#070d0a'
     });
 
-    let faces = trackFaces.concat(scenery);
+    let faces = trackFaces.concat(scenery, itemFaces());
     const tags = [];
     mpOthers().forEach(({ user, p }) => {
       faces = faces.concat(kartFaces(user, p));
@@ -369,6 +462,7 @@ const KartGame = (function(){
     faces = faces.concat(kartFaces(currentUser, me));
 
     Mini3D.render(ctx, faces, cam, W, H, FOCAL);
+    drawShields(cam);
 
     tags.forEach(({ user, p }) => {
       const head = Mini3D.screenPoint({ x: p.x, y: 2.0, z: p.z }, cam, W, H, FOCAL);
@@ -386,6 +480,87 @@ const KartGame = (function(){
     });
 
     drawHud();
+  }
+
+  // Boxes, bananas and shells in flight, all placed from the snapshot the
+  // server just sent. A box the server says is taken simply isn't drawn.
+  function itemFaces(){
+    const out = [];
+    const spin = frame * 0.045;
+    itemBoxes.forEach((b, i) => {
+      if(!(mpBoxMask & (1 << i))) return;
+      const bob = Math.sin(frame * 0.06 + i) * 0.18;
+      const cube = Mini3D.box(0, 1.15 + bob, 0, 1.15, 1.15, 1.15, '#ffc857',
+                              { glow: '#ffc857', glowBlur: 16, alpha: 0.82,
+                                stroke: 'rgba(0,0,0,0.35)', fog: 90 });
+      out.push(...Mini3D.transform(cube, { x: b.x, y: 0, z: b.z, yaw: spin }));
+    });
+    mpHazards.forEach(([x, z]) => {
+      out.push(...Mini3D.box(x, 0.28, z, 0.7, 0.5, 0.7, '#ffe066',
+                             { stroke: 'rgba(0,0,0,0.4)', fog: 90 }));
+    });
+    const now = Date.now();
+    mpShells = mpShells.filter(s => now - s.at < s.ms + 200);
+    mpShells.forEach(s => {
+      const a = mpPlayers.get(s.from), b = mpPlayers.get(s.to);
+      if(!a || !b) return;
+      const t = Math.min(1, (now - s.at) / Math.max(1, s.ms));
+      const x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+      out.push(...Mini3D.box(x, 0.55, z, 0.7, 0.7, 0.7, '#45ffb0',
+                             { glow: '#45ffb0', glowBlur: 18, fog: 90 }));
+    });
+    return out;
+  }
+
+  // A shield is a ring drawn over the kart rather than geometry around it —
+  // a translucent sphere in a painter's-algorithm renderer sorts badly and
+  // ends up swallowing the driver.
+  function drawShields(cam){
+    ctx.save();
+    mpPlayers.forEach((p, user) => {
+      if(!p.shield) return;
+      const pt = Mini3D.screenPoint({ x: p.x, y: 0.9, z: p.z }, cam, W, H, FOCAL);
+      if(!pt) return;
+      const r = Math.max(10, 900 / Math.max(2, Math.hypot(p.x - cam.x, p.z - cam.z)));
+      ctx.strokeStyle = user === currentUser ? 'rgba(45,226,197,0.85)' : 'rgba(125,211,255,0.6)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 5]);
+      ctx.lineDashOffset = -frame * 0.6;
+      ctx.beginPath();
+      ctx.ellipse(pt.x, pt.y, r, r * 0.55, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  // The item you're carrying, front and centre where you'll see it without
+  // taking your eyes off the road.
+  function drawItemSlot(){
+    const x = W/2, y = 42, size = 46;
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,9,15,0.6)';
+    ctx.strokeStyle = myItem ? 'rgba(255,200,87,0.9)' : 'rgba(232,236,241,0.18)';
+    ctx.lineWidth = itemFlash > 0 && (frame >> 2) % 2 ? 3 : 1.5;
+    ctx.beginPath();
+    ctx.roundRect(x - size/2, y - size/2, size, size, 10);
+    ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'center';
+    if(myItem){
+      ctx.font = '26px system-ui, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ITEM_ICONS[myItem] || '🎁', x, y + 1);
+      ctx.textBaseline = 'alphabetic';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.fillStyle = 'rgba(255,200,87,0.9)';
+      ctx.fillText('SPACE', x, y + size/2 + 12);
+    } else {
+      ctx.font = '10px "JetBrains Mono", monospace';
+      ctx.fillStyle = 'rgba(232,236,241,0.3)';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('ITEM', x, y + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.restore();
   }
 
   function drawHud(){
@@ -429,21 +604,36 @@ const KartGame = (function(){
     }
 
     if(finished){
+      // Below the item slot, which owns the top of the screen.
       ctx.textAlign = 'center';
       ctx.font = 'bold 30px "JetBrains Mono", monospace';
       ctx.fillStyle = '#ffc857';
       ctx.shadowColor = '#ffc857'; ctx.shadowBlur = 20;
-      ctx.fillText('FINISHED', W/2, 80);
+      ctx.fillText('FINISHED', W/2, H/2 - 60);
     }
     ctx.restore();
 
     drawDriftMeter();
+    drawItemSlot();
     drawMinimap();
+
+    // Spun out — say so, because the controls going dead is otherwise
+    // indistinguishable from the game having broken.
+    if(Date.now() < spinUntil || mpLocal().spun){
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 22px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#ff3d8a';
+      ctx.shadowColor = '#ff3d8a'; ctx.shadowBlur = 18;
+      ctx.fillText('SPUN OUT', W/2, H/2 - 40);
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.font = '11px "JetBrains Mono", monospace';
     ctx.fillStyle = 'rgba(232,236,241,0.5)';
     ctx.textAlign = 'left';
-    ctx.fillText('W accelerate · S brake · A/D steer · SHIFT drift', 16, H - 14);
+    ctx.fillText('W accelerate · S brake · A/D steer · SHIFT drift · SPACE item', 16, H - 14);
     ctx.restore();
   }
 
@@ -486,6 +676,14 @@ const KartGame = (function(){
     });
     ctx.closePath();
     ctx.stroke();
+    // Bananas on the minimap, so a dropped one is a hazard you can plan
+    // around rather than one you only meet at 200km/h.
+    ctx.fillStyle = 'rgba(255,224,102,0.9)';
+    mpHazards.forEach(([x, z]) => {
+      ctx.beginPath();
+      ctx.arc(cx + x*scale, cy + z*scale, 1.6, 0, Math.PI*2);
+      ctx.fill();
+    });
     mpPlayers.forEach((p, user) => {
       ctx.fillStyle = user === currentUser ? '#2de2c5' : '#ff3d8a';
       ctx.beginPath();
@@ -526,7 +724,16 @@ const KartGame = (function(){
     if(box) box.classList.add('hidden');
   }
 
-  function onKeyPress(){}
+  // Firing is a press, not a hold — a keydown edge, so leaning on space can't
+  // burn through a box the instant you touch it. The server checks you really
+  // have the item, so the worst a stray press does is waste a message.
+  function onKeyPress(name){
+    if(name !== 'space' && name !== 'e') return;
+    if(!myItem || !canFire || finished || countdownLeft() > 0) return;
+    Realtime.send({ type: 'mp:kart-use' });
+    Sfx.play('select');
+    myItem = null;
+  }
 
   function loop(){
     if(!running) return;
@@ -537,7 +744,7 @@ const KartGame = (function(){
 
   function start(){
     showScreen('kart-screen');
-    if(!centre.length) buildTrack();
+    if(!centre.length){ buildTrack(); buildItemBoxes(); }
     reset();
     raceStart = Date.now();
     paused = false; running = true;
@@ -552,5 +759,6 @@ const KartGame = (function(){
   function isPaused(){ return paused; }
   function isRunning(){ return running; }
 
-  return { start, stop, reset, onKeyPress, pause, resume, isPaused, isRunning };
+  return { start, stop, reset, onKeyPress, pause, resume, isPaused, isRunning,
+           gotItem, fizzled, itemBoost, droppedNearby, struck };
 })();
