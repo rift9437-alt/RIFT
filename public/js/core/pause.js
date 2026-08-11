@@ -32,6 +32,8 @@ function currentGameModule(){
     case 'burger-screen': return BurgerGame;
     case 'tag-screen': return TagGame;
     case 'robot-screen': return RobotGame;
+    case 'hub-screen': return HubWorld;
+    case 'kart-screen': return KartGame;
     default: return null;
   }
 }

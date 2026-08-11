@@ -190,7 +190,20 @@ const Realtime = (function(){
     if(wantOpen && !live){ attempt = 0; connect(); }
   });
 
-  return { start, stop, on, isLive };
+  // Fire-and-forget. Returns false when there's no live socket so callers can
+  // fall back — nothing sent this way is allowed to be the only path for
+  // something that matters.
+  function send(obj){
+    if(!ws || ws.readyState !== WebSocket.OPEN || !live) return false;
+    try {
+      ws.send(JSON.stringify(obj));
+      return true;
+    } catch(e){
+      return false;
+    }
+  }
+
+  return { start, stop, on, send, isLive };
 })();
 
 /* ---- subscriptions --------------------------------------------------

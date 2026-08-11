@@ -52,4 +52,6 @@ function stopAllGames(){
   BurgerGame.stop();
   TagGame.stop();
   RobotGame.stop();
+  HubWorld.stop();
+  KartGame.stop();
 }

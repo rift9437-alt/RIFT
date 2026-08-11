@@ -125,5 +125,55 @@ const Mini3D = (function(){
     ];
   }
 
-  return { render, toView, project, clipNear, shade, box, NEAR };
+  // Rotate + translate a group of faces. `box()` is axis-aligned, so this is
+  // what lets a model built in convenient local coordinates — an avatar
+  // facing +z, a kart facing forward — be placed in the world at any angle.
+  // Applied to the points themselves rather than the camera, so a scene can
+  // hold many independently-oriented models in one render call.
+  function transform(faces, t){
+    const yaw = t.yaw || 0;
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const ox = t.x || 0, oy = t.y || 0, oz = t.z || 0;
+    const sc = t.scale == null ? 1 : t.scale;
+    return faces.map(f => Object.assign({}, f, {
+      pts: f.pts.map(p => {
+        const px = p.x * sc, py = p.y * sc, pz = p.z * sc;
+        return {
+          x: ox + px*cy + pz*sy,
+          y: oy + py,
+          z: oz - px*sy + pz*cy
+        };
+      })
+    }));
+  }
+
+  // Cheap horizon-and-ground backdrop, so a 3D scene doesn't sit on a flat
+  // void. Drawn straight to the canvas before any geometry.
+  function sky(ctx, W, H, cam, opts){
+    const o = opts || {};
+    // Pitch shifts the horizon up and down the screen the way looking around
+    // actually would.
+    const horizon = H/2 + (cam.pitch || 0) * (o.focal || 320);
+    const up = ctx.createLinearGradient(0, 0, 0, Math.max(1, horizon));
+    up.addColorStop(0, o.skyTop || '#0a1020');
+    up.addColorStop(1, o.skyBottom || '#1b2b46');
+    ctx.fillStyle = up;
+    ctx.fillRect(0, 0, W, Math.max(0, horizon));
+    const down = ctx.createLinearGradient(0, horizon, 0, H);
+    down.addColorStop(0, o.groundNear || '#16233a');
+    down.addColorStop(1, o.groundFar || '#070b12');
+    ctx.fillStyle = down;
+    ctx.fillRect(0, Math.max(0, horizon), W, H - Math.max(0, horizon));
+    return horizon;
+  }
+
+  // Where a world point lands on screen, or null if it's behind the camera.
+  // Used for name tags and markers that are drawn in 2D over the scene.
+  function screenPoint(p, cam, W, H, focal){
+    const v = toView(p, cam);
+    if(v.z < NEAR) return null;
+    return project(v, W, H, focal);
+  }
+
+  return { render, toView, project, clipNear, shade, box, transform, sky, screenPoint, NEAR };
 })();

@@ -226,7 +226,8 @@ const REASON_QTY_CAPS = {
   hoops_basket: 1,
   burger_order: 1,
   tag_win: 1, tag_loss: 1,
-  robot_win: 1
+  robot_win: 1,
+  kart_win: 1, kart_finish: 1
 };
 
 const DEFAULT_STATS = {
@@ -258,7 +259,8 @@ const DEFAULT_STATS = {
   hoops: { highScore: 0 },
   burger: { highScore: 0 },
   tag: { wins: 0, losses: 0 },
-  robot: { bestRound: 0 }
+  robot: { bestRound: 0 },
+  kart: { wins: 0, races: 0 }
 };
 
 // ---------------------------------------------------------------------------
@@ -307,7 +309,9 @@ const REWARDS = {
   hoops_basket: 2,        // per basket sunk
   burger_order: 4,        // per order served correctly
   tag_win: 20, tag_loss: 5,
-  robot_win: 15           // per arena round won
+  robot_win: 15,          // per arena round won
+  kart_win: 40,           // first across the line
+  kart_finish: 12         // anywhere else on the podium sheet
 };
 
 const SHOP_ITEMS = {
@@ -571,7 +575,8 @@ const REASON_TO_GAME = {
   hoops_basket: 'hoops',
   burger_order: 'burger',
   tag_win: 'tag', tag_loss: 'tag',
-  robot_win: 'robot'
+  robot_win: 'robot',
+  kart_win: 'kart', kart_finish: 'kart'
 };
 
 const GAME_DISPLAY_NAMES = {
@@ -583,10 +588,11 @@ const GAME_DISPLAY_NAMES = {
   pirate: 'Pirate Adventure', samurai: 'Samurai Showdown', policechase: 'Police Chase',
   tactics: 'Tactics Grid', runeduel: 'Rune Duel', warlord: 'Warlord',
   evolution: 'Evolution', flood: 'Flood Escape', hoops: 'Buzzer Beater',
-  burger: 'Burger Rush', tag: 'Neon Tag', robot: 'Robot Arena'
+  burger: 'Burger Rush', tag: 'Neon Tag', robot: 'Robot Arena',
+  kart: 'Rift Kart'
 };
 
-const DEFAULT_WALLET = { tokens: 0, owned: ['neon'], equipped: 'neon', companion: null, asteroidUpgrades: { extraLife: 0, turnSpeed: 0, autoTurret: 0 }, wildduelUpgrades: { extraHp: 0, fasterReload: 0, fasterMovement: 0 }, roguelikeUpgrades: { extraHp: 0, swordDamage: 0, magicPower: 0, swiftBoots: 0 }, achievements: [], secretsFound: 0, stats: { bricksBroken: 0, racesFinished: 0, winStreak: 0, bestWinStreak: 0, tokensEarnedLifetime: 0, secondsPlayed: 0, maxTokensHeld: 0, crateOpens: 0, legendaryCratePulls: 0 }, titles: [], borders: [], seasonBadges: [], xp: 0, level: 1, avatar: '🙂', banner: 'default', friends: [], pendingGifts: [], animatedName: false, createdAt: null, gamePlays: {}, unlockedAvatars: [], unlockedBanners: [], prestige: 0, prestigeBadgeColor: null, daily: null, dailyStreak: 0, dailyBestStreak: 0, dailyLastPerfectDate: null, lastSpinDate: null };
+const DEFAULT_WALLET = { tokens: 0, owned: ['neon'], equipped: 'neon', companion: null, asteroidUpgrades: { extraLife: 0, turnSpeed: 0, autoTurret: 0 }, wildduelUpgrades: { extraHp: 0, fasterReload: 0, fasterMovement: 0 }, roguelikeUpgrades: { extraHp: 0, swordDamage: 0, magicPower: 0, swiftBoots: 0 }, achievements: [], secretsFound: 0, avatar3d: null, stats: { bricksBroken: 0, racesFinished: 0, winStreak: 0, bestWinStreak: 0, tokensEarnedLifetime: 0, secondsPlayed: 0, maxTokensHeld: 0, crateOpens: 0, legendaryCratePulls: 0 }, titles: [], borders: [], seasonBadges: [], xp: 0, level: 1, avatar: '🙂', banner: 'default', friends: [], pendingGifts: [], animatedName: false, createdAt: null, gamePlays: {}, unlockedAvatars: [], unlockedBanners: [], prestige: 0, prestigeBadgeColor: null, daily: null, dailyStreak: 0, dailyBestStreak: 0, dailyLastPerfectDate: null, lastSpinDate: null };
 
 // ---------------------------------------------------------------------------
 // Daily Challenges
@@ -2368,6 +2374,64 @@ app.get('/api/global-stats', async (req, res) => {
     res.json(await globalStats());
   } catch (e) {
     console.error('Global stats failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 3D avatar
+// ---------------------------------------------------------------------------
+// Every player's look is rendered inside everyone else's client, so this is
+// validated hard on the way in rather than trusted. Only six-digit hex
+// colours and a known hat id survive; anything else is dropped rather than
+// stored, so there's nothing a client could smuggle into another player's
+// canvas or DOM.
+const AVATAR_HATS = ['none', 'cap', 'crown', 'band', 'antenna', 'top'];
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+function sanitizeAvatar3d(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  const out = {};
+  for(const key of ['skin', 'shirt', 'pants', 'shoes', 'hatColor']){
+    if(!HEX6.test(raw[key])) return null;
+    out[key] = String(raw[key]).toLowerCase();
+  }
+  if(!AVATAR_HATS.includes(raw.hat)) return null;
+  out.hat = raw.hat;
+  return out;
+}
+
+app.post('/api/avatar3d', async (req, res) => {
+  const { user, avatar } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  const clean = sanitizeAvatar3d(avatar);
+  if (!clean) return res.status(400).json({ error: 'That avatar is not valid.' });
+  try {
+    await withWriteLock(async () => {
+      const data = await loadData();
+      data[user].wallet.avatar3d = clean;
+      await saveData(data);
+    });
+    // So everyone already in a world sees the change without relogging.
+    broadcastEvent('avatar', { user, avatar: clean });
+    res.json({ avatar: clean });
+  } catch (e) {
+    console.error('Avatar save failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Every player's look in one call, so a client entering a world can draw
+// everyone correctly straight away instead of per-player lookups.
+app.get('/api/avatars', async (req, res) => {
+  try {
+    const data = await loadData();
+    const out = {};
+    USERS.forEach(u => { out[u] = (data[u] && data[u].wallet && data[u].wallet.avatar3d) || null; });
+    res.json({ avatars: out });
+  } catch (e) {
+    console.error('Avatar list failed:', e);
     res.status(500).json({ error: 'Internal error' });
   }
 });
@@ -4358,6 +4422,232 @@ app.post('/api/admin/bugs', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Multiplayer rooms
+// ---------------------------------------------------------------------------
+// Shared 3D spaces — the hub world and kart races. Rooms are in memory on
+// purpose: they're ephemeral by nature, a restart just drops everyone back
+// to the lobby list, and keeping them out of Postgres means a 20Hz position
+// relay never touches the database.
+//
+// The server relays movement rather than simulating it, so this is not
+// authoritative physics — with ten friends on a private arcade that trade is
+// worth it for the latency. What the server *does* own is everything that
+// persists: only the finish order is trusted enough to pay tokens, and it's
+// paid through the same earn path everything else uses.
+const MP_TICK_MS = 60;           // ~17 state broadcasts a second
+const MP_ROOM_TTL_MS = 30 * 60 * 1000;
+const MP_MAX_PLAYERS = 8;
+const MP_MODES = {
+  world: { name: 'The Hub', max: 8, min: 1 },
+  kart:  { name: 'Rift Kart', max: 8, min: 1 }
+};
+
+const mpRooms = new Map();       // code -> room
+
+function mpCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code;
+  do {
+    code = '';
+    for(let i=0;i<4;i++) code += chars[Math.floor(Math.random()*chars.length)];
+  } while(mpRooms.has(code));
+  return code;
+}
+
+function mpPublic(room){
+  return {
+    code: room.code,
+    mode: room.mode,
+    modeName: MP_MODES[room.mode].name,
+    name: room.name,
+    host: room.host,
+    started: room.started,
+    locked: room.locked,
+    count: room.players.size,
+    max: MP_MODES[room.mode].max,
+    players: [...room.players.values()].map(p => ({ user: p.user, ready: p.ready }))
+  };
+}
+
+function mpRoomList(){
+  return [...mpRooms.values()]
+    .filter(r => !r.locked)
+    .map(mpPublic)
+    .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code));
+}
+
+// One room per player. Joining a second drops you from the first, which is
+// what you'd want anyway and stops a ghost lingering in the old room.
+function mpLeaveAll(user, exceptCode){
+  for(const room of mpRooms.values()){
+    if(room.code === exceptCode) continue;
+    if(room.players.delete(user)){
+      if(room.players.size === 0){
+        mpRooms.delete(room.code);
+      } else if(room.host === user){
+        room.host = room.players.keys().next().value;
+      }
+      mpBroadcastRoom(room, 'mp:room', mpPublic(room));
+    }
+  }
+}
+
+function mpBroadcastRoom(room, type, payload){
+  const members = new Set(room.players.keys());
+  broadcastEvent(type, payload, user => members.has(user));
+}
+
+// The same centreline the client draws. Kept here because the server already
+// judges checkpoints against it — a start grid placed by a different curve
+// would drop everyone into the infield, which is exactly what it did before
+// this existed.
+const KART_TRACK_R = 30;
+function kartTrackPoint(t){
+  const a = t * Math.PI * 2;
+  const r = KART_TRACK_R + Math.sin(a * 2) * 6 + Math.sin(a * 3) * 3.5;
+  return { x: Math.cos(a) * r, z: Math.sin(a) * r };
+}
+// Heading along the track at t, in the game's convention (x = sin(yaw),
+// z = cos(yaw)).
+function kartTrackYaw(t){
+  const a = kartTrackPoint(t), b = kartTrackPoint(t + 0.002);
+  return Math.atan2(b.x - a.x, b.z - a.z);
+}
+
+function mpFreshPlayer(user, mode){
+  // Spawn positions are spread around a circle so nobody starts inside
+  // somebody else.
+  return {
+    user, ready: false,
+    x: 0, y: 0, z: 0, yaw: 0,
+    vx: 0, vz: 0,
+    phase: 0, moving: false,
+    lap: 0, checkpoint: 0, finished: 0,
+    emote: null, emoteAt: 0,
+    lastInputAt: Date.now()
+  };
+}
+
+function mpSpawn(room, player, index){
+  if(room.mode === 'kart'){
+    // Two columns on a start grid, laid out *along the track* just behind
+    // the line and facing the way the circuit runs.
+    const row = Math.floor(index / 2), col = index % 2;
+    const t = -0.012 - row * 0.010;          // a little way back from t=0
+    const p = kartTrackPoint(t);
+    const yaw = kartTrackYaw(t);
+    // Sideways along the road is the heading rotated a quarter turn.
+    const sx = Math.cos(yaw), sz = -Math.sin(yaw);
+    const lane = col === 0 ? -2.2 : 2.2;
+    player.x = p.x + sx * lane;
+    player.z = p.z + sz * lane;
+    player.yaw = yaw;
+  } else {
+    const a = (index / MP_MAX_PLAYERS) * Math.PI * 2;
+    player.x = Math.cos(a) * 4;
+    player.z = Math.sin(a) * 4;
+    player.yaw = -a;
+  }
+  player.lap = 0; player.checkpoint = 0; player.finished = 0;
+}
+
+// Rooms nobody has touched in half an hour are cleaned up, so a forgotten
+// room can't hold a code or keep broadcasting forever.
+setInterval(() => {
+  const now = Date.now();
+  for(const room of mpRooms.values()){
+    if(now - room.touchedAt > MP_ROOM_TTL_MS) mpRooms.delete(room.code);
+  }
+}, 60000).unref();
+
+app.get('/api/mp/rooms', (req, res) => {
+  res.json({ rooms: mpRoomList(), modes: MP_MODES });
+});
+
+app.post('/api/mp/create', async (req, res) => {
+  const { user, mode, name, locked } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  if (!MP_MODES[mode]) return res.status(400).json({ error: 'Unknown mode' });
+  mpLeaveAll(user);
+  const room = {
+    code: mpCode(),
+    mode,
+    name: String(name || `${user}'s room`).slice(0, 28),
+    host: user,
+    locked: !!locked,
+    started: false,
+    startedAt: 0,
+    players: new Map(),
+    touchedAt: Date.now()
+  };
+  const p = mpFreshPlayer(user, mode);
+  mpSpawn(room, p, 0);
+  room.players.set(user, p);
+  mpRooms.set(room.code, room);
+  res.json({ room: mpPublic(room) });
+});
+
+app.post('/api/mp/join', async (req, res) => {
+  const { user, code } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  const room = mpRooms.get(String(code || '').toUpperCase());
+  if (!room) return res.status(404).json({ error: 'No room with that code.' });
+  if (room.players.size >= MP_MODES[room.mode].max && !room.players.has(user)) {
+    return res.status(400).json({ error: 'That room is full.' });
+  }
+  if (room.started && room.mode === 'kart' && !room.players.has(user)) {
+    return res.status(400).json({ error: 'That race has already started.' });
+  }
+  mpLeaveAll(user, room.code);
+  if (!room.players.has(user)) {
+    const p = mpFreshPlayer(user, room.mode);
+    mpSpawn(room, p, room.players.size);
+    room.players.set(user, p);
+  }
+  room.touchedAt = Date.now();
+  mpBroadcastRoom(room, 'mp:room', mpPublic(room));
+  res.json({ room: mpPublic(room) });
+});
+
+app.post('/api/mp/leave', async (req, res) => {
+  const { user } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  mpLeaveAll(user);
+  res.json({ ok: true });
+});
+
+app.post('/api/mp/ready', async (req, res) => {
+  const { user, ready } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  for(const room of mpRooms.values()){
+    const p = room.players.get(user);
+    if(!p) continue;
+    p.ready = !!ready;
+    room.touchedAt = Date.now();
+    mpBroadcastRoom(room, 'mp:room', mpPublic(room));
+    return res.json({ room: mpPublic(room) });
+  }
+  res.status(400).json({ error: "You're not in a room." });
+});
+
+app.post('/api/mp/start', async (req, res) => {
+  const { user } = req.body || {};
+  if (!requireOwnUser(req, res, user)) return;
+  for(const room of mpRooms.values()){
+    if(!room.players.has(user)) continue;
+    if(room.host !== user) return res.status(403).json({ error: 'Only the host can start.' });
+    room.started = true;
+    room.startedAt = Date.now() + 3000;   // a shared countdown everyone sees
+    let i = 0;
+    for(const p of room.players.values()){ mpSpawn(room, p, i++); p.ready = false; }
+    room.touchedAt = Date.now();
+    mpBroadcastRoom(room, 'mp:start', { code: room.code, startsAt: room.startedAt, room: mpPublic(room) });
+    return res.json({ room: mpPublic(room) });
+  }
+  res.status(400).json({ error: "You're not in a room." });
+});
+
+// ---------------------------------------------------------------------------
 // Realtime (WebSocket)
 // ---------------------------------------------------------------------------
 // One socket per logged-in tab. The client authenticates with the same bearer
@@ -4436,7 +4726,71 @@ wss.on('connection', ws => {
       announcePresence();
       return;
     }
-    if (msg.type === 'ping') wsSend(ws, 'pong', {});
+    if (msg.type === 'ping') { wsSend(ws, 'pong', {}); return; }
+    if (!ws.username) return;   // everything below acts as a player
+
+    // Movement. Clamped and range-checked rather than trusted: a bad or
+    // hostile client can misplace *itself*, which is a cosmetic problem, but
+    // it can't hand itself laps, tokens or a place in the finish order —
+    // those are decided below and on the REST side.
+    if (msg.type === 'mp:move') {
+      const room = mpRoomOf(ws.username);
+      if (!room) return;
+      const p = room.players.get(ws.username);
+      if (!p) return;
+      const num = (v, limit) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.max(-limit, Math.min(limit, n)) : 0;
+      };
+      p.x = num(msg.x, 400);
+      p.y = num(msg.y, 100);
+      p.z = num(msg.z, 400);
+      p.yaw = num(msg.yaw, Math.PI * 4);
+      p.phase = num(msg.phase, 1e6);
+      p.moving = !!msg.moving;
+      p.lastInputAt = Date.now();
+      room.touchedAt = p.lastInputAt;
+      return;
+    }
+
+    // Lap progress. The server keeps the counter and only accepts the *next*
+    // checkpoint in sequence, so a client can't run the count up by claiming
+    // the finish line over and over.
+    if (msg.type === 'mp:checkpoint') {
+      const room = mpRoomOf(ws.username);
+      if (!room || room.mode !== 'kart' || !room.started) return;
+      const p = room.players.get(ws.username);
+      if (!p || p.finished) return;
+      const idx = Number(msg.index);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= KART_CHECKPOINTS) return;
+      if (idx !== (p.checkpoint % KART_CHECKPOINTS)) return;
+      p.checkpoint++;
+      if (p.checkpoint % KART_CHECKPOINTS === 0) {
+        p.lap++;
+        if (p.lap >= KART_LAPS) {
+          p.finished = Date.now();
+          const place = [...room.players.values()].filter(q => q.finished).length;
+          mpBroadcastRoom(room, 'mp:finish', {
+            user: ws.username, place, time: p.finished - room.startedAt
+          });
+          awardKartFinish(ws.username, place).catch(e =>
+            console.error('Kart payout failed:', e));
+        }
+      }
+      return;
+    }
+
+    if (msg.type === 'mp:emote') {
+      const room = mpRoomOf(ws.username);
+      if (!room) return;
+      const p = room.players.get(ws.username);
+      if (!p) return;
+      const emote = String(msg.emote || '').slice(0, 8);
+      p.emote = emote;
+      p.emoteAt = Date.now();
+      mpBroadcastRoom(room, 'mp:emote', { user: ws.username, emote });
+      return;
+    }
   });
 
   ws.on('close', () => {
@@ -4449,6 +4803,78 @@ wss.on('connection', ws => {
     liveSockets.delete(ws);
   });
 });
+
+// The kart track is defined server-side too, so lap counting can't be argued
+// with by a client that draws a different one.
+const KART_CHECKPOINTS = 8;
+const KART_LAPS = 3;
+
+function mpRoomOf(user){
+  for(const room of mpRooms.values()){
+    if(room.players.has(user)) return room;
+  }
+  return null;
+}
+
+// Finishing pays through the same wallet path as everything else, so the
+// lifetime totals and achievement checks stay consistent.
+async function awardKartFinish(user, place){
+  if(!USERS.includes(user)) return;
+  const reason = place === 1 ? 'kart_win' : 'kart_finish';
+  await withWriteLock(async () => {
+    const data = await loadData();
+    const wallet = data[user].wallet;
+    const amount = REWARDS[reason] || 0;
+    wallet.tokens += amount;
+    if(!wallet.stats) wallet.stats = {};
+    wallet.stats.tokensEarnedLifetime = (wallet.stats.tokensEarnedLifetime || 0) + amount;
+    const rec = data[user].kart;
+    if(rec){
+      rec.races = (rec.races || 0) + 1;
+      if(place === 1) rec.wins = (rec.wins || 0) + 1;
+    }
+    checkAchievements(data, user);
+    await saveData(data);
+  });
+}
+
+// The relay tick — one compact snapshot per room. Positions only; everything
+// durable already went through an endpoint.
+setInterval(() => {
+  const now = Date.now();
+  for(const room of mpRooms.values()){
+    if(room.players.size === 0) continue;
+
+    // Drop anyone whose socket went away, so their avatar doesn't stand
+    // around after they've closed the tab.
+    const connected = new Set([...liveSockets].map(w => w.username).filter(Boolean));
+    let changed = false;
+    for(const user of [...room.players.keys()]){
+      if(!connected.has(user)){ room.players.delete(user); changed = true; }
+    }
+    if(changed){
+      if(room.players.size === 0){ mpRooms.delete(room.code); continue; }
+      if(!room.players.has(room.host)) room.host = room.players.keys().next().value;
+      mpBroadcastRoom(room, 'mp:room', mpPublic(room));
+    }
+
+    const players = [...room.players.values()].map(p => ({
+      u: p.user,
+      x: Math.round(p.x * 100) / 100,
+      y: Math.round(p.y * 100) / 100,
+      z: Math.round(p.z * 100) / 100,
+      a: Math.round(p.yaw * 100) / 100,
+      h: Math.round(p.phase * 10) / 10,
+      m: p.moving ? 1 : 0,
+      l: p.lap,
+      f: p.finished ? 1 : 0,
+      e: (p.emote && now - p.emoteAt < 2500) ? p.emote : null
+    }));
+    mpBroadcastRoom(room, 'mp:state', {
+      code: room.code, t: now, startsAt: room.startedAt, players
+    });
+  }
+}, MP_TICK_MS).unref();
 
 // Render's proxy will happily hold a half-dead socket open; the ping/pong
 // sweep is what actually reaps them.

@@ -2115,6 +2115,51 @@
   <div class="clans-wrap" id="tournaments-body"></div>
 </div>
 
+<!-- ============ MULTIPLAYER LOBBY SCREEN ============ -->
+<div id="mp-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:1000px;">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🎮 PLAY TOGETHER</div>
+  </div>
+  <div class="clans-wrap" id="mp-body"></div>
+</div>
+
+<!-- ============ THE HUB SCREEN ============ -->
+<div id="hub-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="leaveMpWorld()">&larr; LEAVE</button>
+    <div class="game-title">🌍 THE HUB</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="play-area">
+    <canvas id="hub-canvas" width="860" height="500"></canvas>
+  </div>
+</div>
+
+<!-- ============ RIFT KART SCREEN ============ -->
+<div id="kart-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="leaveMpWorld()">&larr; LEAVE</button>
+    <div class="game-title">🏎 RIFT KART</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="play-area">
+    <canvas id="kart-canvas" width="860" height="500"></canvas>
+  </div>
+</div>
+
+<!-- ============ AVATAR CREATOR SCREEN ============ -->
+<div id="avatar-screen" class="screen hidden">
+  <div class="game-topbar" style="max-width:1000px;">
+    <button class="back-btn" onclick="closeAvatarCreator()">&larr; ARCADE</button>
+    <div class="game-title">🧍 YOUR AVATAR</div>
+  </div>
+  <div class="avatar-wrap">
+    <canvas id="avatar-canvas" width="420" height="460"></canvas>
+    <div id="avatar-controls"></div>
+  </div>
+</div>
+
 <!-- ============ CLANS SCREEN ============ -->
 <div id="clans-screen" class="screen hidden">
   <div class="game-topbar" style="max-width:1000px;">
@@ -2159,6 +2204,7 @@
 
 <script src="js/core/config.js"></script>
 <script src="js/core/auth.js"></script>
+<script src="js/core/avatar3d.js"></script>
 <script src="js/core/realtime.js"></script>
 <script src="js/core/screens.js"></script>
 <script src="js/core/leaderboard.js"></script>
@@ -2203,12 +2249,16 @@
 <script src="js/games/runeduel.js"></script>
 <script src="js/games/warlord.js"></script>
 <script src="js/features/admin.js"></script>
+<script src="js/games/hubworld.js"></script>
+<script src="js/games/kart.js"></script>
 <script src="js/games/evolution.js"></script>
 <script src="js/games/flood.js"></script>
 <script src="js/games/hoops.js"></script>
 <script src="js/games/burger.js"></script>
 <script src="js/games/tag.js"></script>
 <script src="js/games/robot.js"></script>
+<script src="js/features/avatarcreator.js"></script>
+<script src="js/features/multiplayer.js"></script>
 <script src="js/features/clans.js"></script>
 <script src="js/features/gazette.js"></script>
 <script src="js/features/qol.js"></script>

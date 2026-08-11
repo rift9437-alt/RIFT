@@ -495,3 +495,165 @@
   font-size: 11px;
   color: var(--text-dim);
 }
+
+/* =========================================================
+   AVATAR CREATOR
+   ========================================================= */
+.avatar-wrap {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 18px 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 420px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+#avatar-canvas {
+  width: 100%;
+  height: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: grab;
+  touch-action: none;
+}
+#avatar-canvas:active { cursor: grabbing; }
+
+#avatar-controls {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.av-group { margin-bottom: 14px; }
+.av-row { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.av-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.08s ease;
+}
+.av-swatch:hover { transform: scale(1.12); }
+.av-swatch.selected {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--bg-panel), 0 0 10px var(--cyan);
+}
+.av-hat { padding: 6px 12px; font-size: 11px; }
+
+.av-actions { display: flex; gap: 8px; margin: 14px 0 4px; }
+.av-actions .btn { flex: 1; margin-top: 0; }
+
+@media (max-width: 820px) {
+  .avatar-wrap { grid-template-columns: 1fr; }
+}
+
+/* =========================================================
+   MULTIPLAYER LOBBY
+   ========================================================= */
+.mp-create, .mp-join, .mp-room {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.mp-create-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.mp-create-row .clan-input { margin-bottom: 0; }
+.mp-create-row .btn { margin-top: 0; flex: 0 0 auto; }
+.mp-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.mp-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--pink);
+  border-radius: 12px;
+  padding: 13px 16px;
+}
+.mp-card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mp-code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 3px;
+  color: var(--pink);
+}
+.mp-name { font-weight: 600; flex: 1; min-width: 100px; }
+.mp-mode, .mp-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.mp-live { font-family: var(--font-mono); font-size: 10px; color: var(--gold); }
+.mp-players { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+.mp-room-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.mp-room-name { font-size: 17px; font-weight: 600; }
+.mp-room-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.mp-room-code {
+  text-align: right;
+  background: var(--bg);
+  border: 1px dashed var(--pink);
+  border-radius: 10px;
+  padding: 8px 14px;
+}
+.mp-room-code span {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+}
+.mp-room-code b {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  letter-spacing: 6px;
+  color: var(--pink);
+}
+
+.mp-roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 10px;
+}
+.mp-seat {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.mp-seat.ready { border-color: var(--cyan); }
+.mp-seat i { display: block; font-style: normal; font-size: 9px; color: var(--text-dim); }
+.mp-seat.ready i { color: var(--cyan); }
+.mp-seat-av { width: 100%; height: auto; display: block; }
+.mp-seat-empty {
+  border-style: dashed;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 90px;
+}
+
+.mp-room-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.mp-room-actions .btn { flex: 1; margin-top: 0; min-width: 120px; }
