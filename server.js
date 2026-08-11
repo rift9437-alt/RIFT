@@ -227,6 +227,7 @@ const REASON_QTY_CAPS = {
   burger_order: 1,
   tag_win: 1, tag_loss: 1,
   robot_win: 1,
+  mystery_solved: 1,
   kart_win: 1, kart_finish: 1,
   hub_coin: 1,
   pumpkin_pick: 5, ghost_banish: 3
@@ -262,6 +263,7 @@ const DEFAULT_STATS = {
   burger: { highScore: 0 },
   tag: { wins: 0, losses: 0 },
   robot: { bestRound: 0 },
+  whodidit: { solved: 0 },
   kart: { wins: 0, races: 0 }
 };
 
@@ -312,6 +314,7 @@ const REWARDS = {
   burger_order: 4,        // per order served correctly
   tag_win: 20, tag_loss: 5,
   robot_win: 15,          // per arena round won
+  mystery_solved: 45,     // the right name, before the clock ran out
   kart_win: 40,           // first across the line
   kart_finish: 12,        // anywhere else on the podium sheet
   hub_coin: 2,            // a token picked up in the hub
@@ -387,6 +390,7 @@ const ACHIEVEMENTS = {
   tokens_50000:   { name: 'High Roller',            icon: '🏦', desc: 'Earn 50,000 tokens over your lifetime.',             reward: { tokens: 4000, title: 'Tycoon' } },
   bricks_20000:   { name: 'Wrecking Ball',          icon: '💥', desc: 'Break 20,000 bricks in Neon Breaker.',               reward: { tokens: 4000, title: 'Demolition Expert' } },
   races_500:      { name: 'Road Warrior',           icon: '🏁', desc: 'Finish 500 races in Apex Loop.',                     reward: { tokens: 4000 } },
+  sleuth_25:      { name: 'Sleuth',                 icon: '🔍', desc: 'Close 25 cases in Who Did It?',                      reward: { tokens: 3000, title: 'Sleuth' } },
   collector:      { name: 'Collector',              icon: '🎨', desc: 'Own every non-limited theme in the shop.',           reward: { tokens: 5000, title: 'Collector', border: 'collector-border' } },
 
   // Secret achievements — hidden as "???" until unlocked (see GET /api/achievements).
@@ -439,6 +443,7 @@ function checkAchievements(data, user) {
     tokens_50000:   wallet.stats.tokensEarnedLifetime >= 50000,
     bricks_20000:   wallet.stats.bricksBroken >= 20000,
     races_500:      wallet.stats.racesFinished >= 500,
+    sleuth_25:      (data[user].whodidit?.solved || 0) >= 25,
     // Collector counts only permanent, non-limited themes — a seasonal
     // theme rotating out shouldn't make this achievement unobtainable.
     collector:      Object.keys(SHOP_ITEMS)
@@ -621,6 +626,7 @@ const REASON_TO_GAME = {
   burger_order: 'burger',
   tag_win: 'tag', tag_loss: 'tag',
   robot_win: 'robot',
+  mystery_solved: 'whodidit',
   kart_win: 'kart', kart_finish: 'kart'
 };
 
@@ -634,7 +640,7 @@ const GAME_DISPLAY_NAMES = {
   tactics: 'Tactics Grid', runeduel: 'Rune Duel', warlord: 'Warlord',
   evolution: 'Evolution', flood: 'Flood Escape', hoops: 'Buzzer Beater',
   burger: 'Burger Rush', tag: 'Neon Tag', robot: 'Robot Arena',
-  kart: 'Rift Kart'
+  whodidit: 'Who Did It?', kart: 'Rift Kart'
 };
 
 const DEFAULT_WALLET = { tokens: 0, owned: ['neon'], equipped: 'neon', companion: null, asteroidUpgrades: { extraLife: 0, turnSpeed: 0, autoTurret: 0 }, wildduelUpgrades: { extraHp: 0, fasterReload: 0, fasterMovement: 0 }, roguelikeUpgrades: { extraHp: 0, swordDamage: 0, magicPower: 0, swiftBoots: 0 }, achievements: [], secretsFound: 0, avatar3d: null, spooky: { pumpkins: 0, ghosts: 0, midnight: false, thirteenth: false }, stats: { bricksBroken: 0, racesFinished: 0, winStreak: 0, bestWinStreak: 0, tokensEarnedLifetime: 0, secondsPlayed: 0, maxTokensHeld: 0, crateOpens: 0, legendaryCratePulls: 0 }, titles: [], borders: [], seasonBadges: [], xp: 0, level: 1, avatar: '🙂', banner: 'default', friends: [], pendingGifts: [], animatedName: false, createdAt: null, gamePlays: {}, unlockedAvatars: [], unlockedBanners: [], prestige: 0, prestigeBadgeColor: null, daily: null, dailyStreak: 0, dailyBestStreak: 0, dailyLastPerfectDate: null, lastSpinDate: null };

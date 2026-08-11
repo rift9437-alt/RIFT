@@ -277,7 +277,8 @@ const LB_BOARDS = [
   { game:'hoops',     title:'🏀 Buzzer Beater',    cols:[['highScore','High Score']] },
   { game:'burger',    title:'🍔 Burger Rush',      cols:[['highScore','Served']] },
   { game:'tag',       title:'🏃 Neon Tag',         cols:[['wins','Wins']] },
-  { game:'robot',     title:'🤖 Robot Arena',      cols:[['bestRound','Best Round']] }
+  { game:'robot',     title:'🤖 Robot Arena',      cols:[['bestRound','Best Round']] },
+  { game:'whodidit',  title:'🔍 Who Did It?',      cols:[['solved','Cases Solved']] }
 ];
 
 async function renderLeaderboard(){

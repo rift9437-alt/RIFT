@@ -112,7 +112,8 @@ const CABINET_KEYWORDS = {
   hoops:'sports basketball shooting arcade aiming',
   burger:'cooking arcade time management food',
   tag:'party versus chase running arena',
-  robot:'fighting versus mech arena building shooter'
+  robot:'fighting versus mech arena building shooter roguelike parts',
+  whodidit:'mystery detective puzzle investigation clues suspects story'
 };
 
 let cabinetSearch = '';

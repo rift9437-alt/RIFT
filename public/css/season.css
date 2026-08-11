@@ -33,6 +33,11 @@ body.season-2::after {
 body.season-2::before { left: 0; }
 body.season-2::after  { right: 0; transform: scaleX(-1); }
 
+/* Charming over the arcade floor, noise over a game. Anything with a play
+   area gets the corners back. */
+body.season-2:has(.game-screen:not(.hidden))::before,
+body.season-2:has(.game-screen:not(.hidden))::after { display: none; }
+
 /* The dashboard title gets a flicker, like the sign is going. */
 body.season-2 .dash-title {
   color: #ff7518;

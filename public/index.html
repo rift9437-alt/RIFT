@@ -13,13 +13,14 @@
   <link rel="stylesheet" href="css/companions.css">
   <link rel="stylesheet" href="css/ui.css">
   <link rel="stylesheet" href="css/qol.css">
-<link rel="stylesheet" href="css/clans.css">
-<link rel="stylesheet" href="css/shop-rotation.css">
-<link rel="stylesheet" href="css/gazette.css">
-<link rel="stylesheet" href="css/avatar.css">
-<link rel="stylesheet" href="css/multiplayer.css">
-<link rel="stylesheet" href="css/season.css">
-<link rel="stylesheet" href="css/robot.css">
+  <link rel="stylesheet" href="css/clans.css">
+  <link rel="stylesheet" href="css/shop-rotation.css">
+  <link rel="stylesheet" href="css/gazette.css">
+  <link rel="stylesheet" href="css/avatar.css">
+  <link rel="stylesheet" href="css/multiplayer.css">
+  <link rel="stylesheet" href="css/season.css">
+  <link rel="stylesheet" href="css/robot.css">
+  <link rel="stylesheet" href="css/whodidit.css">
 </head>
 <body>
 <div class="scanlines"></div>
@@ -1992,6 +1993,37 @@
   </div>
 </div>
 
+<!-- ============ WHO DID IT? SCREEN ============ -->
+<div id="whodidit-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="backToDashboard()">&larr; ARCADE</button>
+    <div class="game-title">🔍 WHO DID IT?</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="setup-panel" id="whodidit-setup">
+    <div class="controls-box">
+      Something has gone missing from the arcade. Five suspects, four rooms, three minutes.<br>
+      <b>Search a room</b> to turn up physical evidence &mdash; a thread, a scuff mark, a set of
+      prints. Evidence never lies, but it never names anyone either.<br>
+      <b>Question a suspect</b> for a statement. Everyone volunteers where they were and a
+      couple of facts about themselves, and exactly one of them is lying about their alibi.<br>
+      Both cost you time, so you can't do everything. When you're sure, name the culprit.
+      A new case is generated every run.
+    </div>
+    <button class="btn btn-primary" onclick="WhoDidItGame.start()">Open the Case</button>
+  </div>
+  <div class="play-area hidden" id="whodidit-play">
+    <canvas id="whodidit-canvas" width="760" height="480"></canvas>
+    <div id="whodidit-controls" class="wdi-controls"></div>
+  </div>
+  <div class="result-overlay hidden" id="whodidit-result">
+    <h3 id="whodidit-result-text"></h3>
+    <p id="whodidit-result-sub"></p>
+    <button class="btn btn-pink" onclick="WhoDidItGame.start()">New Case</button>
+    <button class="btn btn-ghost" onclick="backToDashboard()">Leave</button>
+  </div>
+</div>
+
 <!-- ============ PAUSE OVERLAY (shared across all games) ============ -->
 <div id="pause-overlay" class="modal-overlay hidden">
   <div class="modal-card" style="text-align:center;">
@@ -2271,6 +2303,7 @@
 <script src="js/games/burger.js"></script>
 <script src="js/games/tag.js"></script>
 <script src="js/games/robot.js"></script>
+<script src="js/games/whodidit.js"></script>
 <script src="js/features/avatarcreator.js"></script>
 <script src="js/features/multiplayer.js"></script>
 <script src="js/features/clans.js"></script>

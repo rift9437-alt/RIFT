@@ -1,0 +1,75 @@
+/* =========================================================
+   WHO DID IT? — case-file controls
+   =========================================================
+   The board itself is canvas; these are the real buttons that sit under it,
+   because a point-and-click needs proper hit targets and keyboard focus. */
+.wdi-controls {
+  width: 100%;
+  max-width: 760px;
+  margin: 12px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wdi-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.wdi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wdi-btn {
+  flex: 1 1 auto;
+  min-width: 130px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--c, var(--cyan));
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, border-color 0.12s, transform 0.12s;
+}
+.wdi-btn:hover {
+  background: var(--bg-panel-raised);
+  transform: translateY(-1px);
+}
+.wdi-btn:focus-visible {
+  outline: 2px solid var(--c, var(--cyan));
+  outline-offset: 2px;
+}
+
+/* Already searched / already questioned. Still clickable — it just tells you
+   so instead of quietly charging you the time again. */
+.wdi-btn.done {
+  opacity: 0.45;
+  border-left-color: var(--border);
+}
+.wdi-btn.done::after {
+  content: ' ✓';
+  color: var(--lime);
+}
+
+.wdi-accuse {
+  border: 1px solid var(--c, var(--pink));
+  border-left-width: 3px;
+  text-align: center;
+}
+.wdi-accuse:hover {
+  background: color-mix(in srgb, var(--c, var(--pink)) 18%, var(--bg-panel));
+}
+
+@media (max-width: 640px) {
+  .wdi-btn { min-width: 100%; }
+}

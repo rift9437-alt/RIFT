@@ -32,6 +32,7 @@ function currentGameModule(){
     case 'burger-screen': return BurgerGame;
     case 'tag-screen': return TagGame;
     case 'robot-screen': return RobotGame;
+    case 'whodidit-screen': return WhoDidItGame;
     case 'hub-screen': return HubWorld;
     case 'kart-screen': return KartGame;
     case 'thirteen-screen': return ThirteenGame;
