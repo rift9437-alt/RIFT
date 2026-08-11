@@ -313,7 +313,7 @@ function renderCabinets(){
     const fav = typeof Prefs !== 'undefined' && Prefs.isFavourite(cab.id);
     const recentIdx = recents.indexOf(cab.id);
     return `
-      <div class="cabinet ${cab.leader?'cabinet-leader':''}" style="--accent-c:${cab.accent}" onclick="launchCabinet('${cab.id}')">
+      <div class="cabinet ${cab.leader?'cabinet-leader':''} ${typeof isSpookyCabinet === 'function' && isSpookyCabinet(cab.id) ? 'cabinet-haunted' : ''}" style="--accent-c:${cab.accent}" onclick="launchCabinet('${cab.id}')">
         <button class="fav-star ${fav?'on':''}" title="${fav?'Unpin':'Pin to top'}"
                 onclick="toggleCabinetFavourite('${cab.id}', event)">${fav?'★':'☆'}</button>
         ${fav ? '<div class="cabinet-pin">Pinned</div>' : ''}

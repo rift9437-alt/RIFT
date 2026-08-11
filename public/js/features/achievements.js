@@ -21,6 +21,7 @@ async function loadSeasonInfo(){
     const res = await apiFetch(`${LB_API_BASE}/season`);
     if(!res.ok) throw new Error('Bad response: ' + res.status);
     seasonInfo = await res.json();
+    applySeasonSkin();
   }catch(e){
     console.error('Season info load failed:', e);
   }
@@ -75,4 +76,25 @@ async function renderAchievements(){
       </div>
     `;
   }).join('');
+}
+
+/* =========================================================
+   SEASONAL SKIN
+   =========================================================
+   Adds a class to <body> for the running season so CSS can dress the whole
+   site without any screen needing to know about it. Season 2 puts cobwebs in
+   the corners, tints the cabinet grid, and marks the spooky cabinets. When
+   CURRENT_SEASON moves on, the class stops being applied and everything
+   returns to normal on its own. */
+function applySeasonSkin(){
+  const body = document.body;
+  body.classList.remove('season-1', 'season-2');
+  if(seasonInfo && seasonInfo.current) body.classList.add('season-' + seasonInfo.current);
+}
+
+// Cabinets that get a spooky treatment for Season 2 — the ones whose theme
+// already sits close enough to horror that a coat of paint is enough.
+const SPOOKY_CABINETS = ['roguelike', 'depths', 'zombie', 'samurai', 'flood', 'evolution', 'tunnel'];
+function isSpookyCabinet(id){
+  return seasonInfo && seasonInfo.current === 2 && SPOOKY_CABINETS.includes(id);
 }

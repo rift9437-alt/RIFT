@@ -54,4 +54,5 @@ function stopAllGames(){
   RobotGame.stop();
   HubWorld.stop();
   KartGame.stop();
+  ThirteenGame.stop();
 }

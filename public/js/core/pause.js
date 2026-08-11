@@ -34,6 +34,7 @@ function currentGameModule(){
     case 'robot-screen': return RobotGame;
     case 'hub-screen': return HubWorld;
     case 'kart-screen': return KartGame;
+    case 'thirteen-screen': return ThirteenGame;
     default: return null;
   }
 }

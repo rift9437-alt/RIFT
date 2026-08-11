@@ -1,0 +1,92 @@
+/* =========================================================
+   SEASONAL SKIN
+   =========================================================
+   Everything here hangs off a class on <body> that the client sets from the
+   season the server reports, so no screen has to know a season is running
+   and the whole lot switches off by itself when CURRENT_SEASON moves on. */
+
+/* ---- Season 2: Haunted Arcade ---------------------------------------- */
+
+/* Cobwebs in the top corners of every screen. Pure CSS gradients so there's
+   no image to load, and pointer-events:none so they never eat a click. */
+body.season-2::before,
+body.season-2::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  width: 190px;
+  height: 190px;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0.5;
+  background:
+    repeating-conic-gradient(from 0deg at 0% 0%,
+      transparent 0deg 11deg,
+      rgba(223, 233, 255, 0.5) 11deg 11.6deg),
+    radial-gradient(circle at 0% 0%,
+      transparent 0 22px, rgba(223, 233, 255, 0.34) 22px 23px,
+      transparent 23px 46px, rgba(223, 233, 255, 0.34) 46px 47px,
+      transparent 47px 74px, rgba(223, 233, 255, 0.28) 74px 75px,
+      transparent 75px 108px, rgba(223, 233, 255, 0.22) 108px 109px,
+      transparent 109px);
+}
+body.season-2::before { left: 0; }
+body.season-2::after  { right: 0; transform: scaleX(-1); }
+
+/* The dashboard title gets a flicker, like the sign is going. */
+body.season-2 .dash-title {
+  color: #ff7518;
+  text-shadow: 0 0 12px rgba(255, 117, 24, 0.55);
+  animation: season2-flicker 6s infinite steps(1, end);
+}
+@keyframes season2-flicker {
+  0%, 42%, 46%, 62%, 66%, 100% { opacity: 1; }
+  43%, 45% { opacity: 0.35; }
+  63%, 65% { opacity: 0.5; }
+}
+
+/* Cabinets given the spooky treatment wear a pumpkin and a purple edge. */
+body.season-2 .cabinet-haunted {
+  border-color: rgba(139, 92, 246, 0.55);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.2) inset;
+}
+body.season-2 .cabinet-haunted::after {
+  content: "🎃";
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 15px;
+  opacity: 0.9;
+  pointer-events: none;
+}
+body.season-2 .cabinet-haunted .cabinet-name { color: #ffb347; }
+
+/* The season banner itself. */
+body.season-2 .season-badge-icon {
+  filter: drop-shadow(0 0 10px rgba(255, 117, 24, 0.6));
+}
+
+/* Limited seasonal items in the shop are marked so it's obvious they go. */
+.shop-card.limited-season {
+  border-color: rgba(255, 117, 24, 0.6);
+}
+.limited-tag {
+  display: inline-block;
+  background: linear-gradient(90deg, #ff7518, #8b5cf6);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-left: 6px;
+}
+
+@media (max-width: 700px) {
+  body.season-2::before, body.season-2::after { width: 110px; height: 110px; }
+}
+
+/* Anyone who prefers less motion shouldn't get a flickering sign. */
+@media (prefers-reduced-motion: reduce) {
+  body.season-2 .dash-title { animation: none; }
+}

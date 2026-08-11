@@ -369,3 +369,25 @@ function leaveMpWorld(){
   document.getElementById('pause-overlay').classList.add('hidden');
   openMultiplayer();
 }
+
+/* ---- Season 2 progress ----------------------------------------------
+   Pumpkins and ghosts are reported to the server rather than counted in the
+   client, so the seasonal badges can't be handed out by a page reload. The
+   server caps how many can be claimed per call and refuses the whole thing
+   once the season is over. */
+async function postSpooky(event, qty){
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/season/spooky`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser, event, qty })
+    });
+    if(!res.ok) return null;
+    const data = await res.json();
+    if(wallet) wallet.spooky = data.spooky;
+    return data.spooky;
+  }catch(e){
+    console.error('Season progress failed:', e);
+    return null;
+  }
+}

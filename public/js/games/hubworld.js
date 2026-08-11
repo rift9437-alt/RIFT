@@ -26,6 +26,15 @@ const HubWorld = (function(){
   let props = [];
   let coins = [];
   let collected = 0;
+  // Season 2 turns the plaza into the haunted arcade: pumpkins instead of
+  // tokens, ghosts drifting about, and the lights gone wrong. Driven by the
+  // season the server reports, so it switches off on its own when the season
+  // ends rather than needing a code change.
+  let ghosts = [];
+  let banished = 0;
+  let spookyPending = { pumpkin: 0, ghost: 0 };
+  let ended13 = false;   // one trip through the gate per visit
+  function haunted(){ return typeof seasonInfo !== 'undefined' && seasonInfo && seasonInfo.current === 2; }
   // Speech bubbles keyed by player, fed from the chat room so what you say
   // in chat also appears over your head in here.
   const bubbles = new Map();
@@ -71,6 +80,31 @@ const HubWorld = (function(){
     out.push(...Mini3D.box(0, 1.6, 0, 0.5, 1.4, 0.5, '#0f1626', edge));
     out.push(...Mini3D.box(0, 2.5, 0, 1.2, 0.5, 1.2, '#ffc857', { glow: '#ffc857', glowBlur: 22 }));
 
+    // Season decorations. Jack-o'-lanterns on the pillars and gravestones
+    // round the edge — same plaza, different night.
+    if(haunted()){
+      for(let i=0;i<12;i++){
+        const a = (i/12) * Math.PI*2;
+        const x = Math.cos(a) * 18, z = Math.sin(a) * 18;
+        out.push(...Mini3D.box(x, 4.3, z, 1.0, 0.9, 1.0, '#ff7518',
+                               { glow: '#ff7518', glowBlur: 22 }));
+        out.push(...Mini3D.box(x, 4.95, z, 0.16, 0.4, 0.16, '#3d6b2e', edge));
+      }
+      for(let i=0;i<16;i++){
+        const a = (i/16) * Math.PI*2 + 0.2;
+        const r = 22 + (i % 3);
+        const gx = Math.cos(a) * r, gz = Math.sin(a) * r;
+        out.push(...Mini3D.box(gx, 0.7, gz, 1.1, 1.4, 0.28, '#5b6470', edge));
+        out.push(...Mini3D.box(gx, 1.5, gz, 1.1, 0.5, 0.28, '#5b6470', edge));
+      }
+      // a crooked gate where the thirteenth cabinet would be
+      out.push(...Mini3D.box(0, 2.6, -20, 0.5, 5.2, 0.5, '#2a1d12', edge));
+      out.push(...Mini3D.box(5, 2.6, -20, 0.5, 5.2, 0.5, '#2a1d12', edge));
+      out.push(...Mini3D.box(2.5, 5.0, -20, 6, 0.6, 0.6, '#2a1d12', edge));
+      out.push(...Mini3D.box(2.5, 1.8, -20, 3.2, 3.6, 0.2, '#0a0710',
+                             { glow: '#8b5cf6', glowBlur: 26 }));
+    }
+
     // scattered blocks to jump on
     const spots = [[-9,5],[8,-6],[11,7],[-12,-8],[5,12],[-6,-13]];
     spots.forEach(([x,z], i) => {
@@ -91,6 +125,20 @@ const HubWorld = (function(){
       const a = (i/10) * Math.PI*2 + Math.random()*0.4;
       const r = 8 + Math.random()*13;
       coins.push({ x: Math.cos(a)*r, z: Math.sin(a)*r, taken: 0 });
+    }
+  }
+
+  // Ghosts drift toward whoever is nearest and are banished by walking into
+  // them — the point is that they're a nuisance you clear, not a threat.
+  function spawnGhosts(){
+    ghosts = [];
+    if(!haunted()) return;
+    for(let i=0;i<6;i++){
+      const a = (i/6) * Math.PI*2;
+      ghosts.push({
+        x: Math.cos(a)*20, z: Math.sin(a)*20,
+        yaw: 0, bob: Math.random()*Math.PI*2, gone: 0
+      });
     }
   }
 
@@ -157,9 +205,47 @@ const HubWorld = (function(){
         c.taken = frame;
         collected++;
         Sfx.play('coin', 1.4);
-        earnTokens('hub_coin', 1);
+        if(haunted()) spookyPending.pumpkin++;
+        else earnTokens('hub_coin', 1);
       }
     });
+
+    // ghosts
+    ghosts.forEach(g => {
+      if(g.gone){
+        if(frame - g.gone > 900){ g.gone = 0; }   // back after fifteen seconds
+        return;
+      }
+      const dx = me.x - g.x, dz = me.z - g.z;
+      const d = Math.hypot(dx, dz) || 1;
+      g.yaw = Math.atan2(dx, dz);
+      g.bob += 0.05;
+      if(d > 1.0){
+        g.x += (dx/d) * 0.022;
+        g.z += (dz/d) * 0.022;
+      } else {
+        g.gone = frame;
+        banished++;
+        spookyPending.ghost++;
+        Sfx.play('explode', 1.4);
+        if(typeof scorePop === 'function') scorePop('BANISHED', 'big');
+      }
+    });
+
+    // Progress is batched rather than one request per pickup — a plaza full
+    // of pumpkins would otherwise be a request storm.
+    if(frame % 120 === 0) flushSpooky();
+
+    // The crooked gate. Walking into it is the only way to cabinet thirteen —
+    // it's on no card and in no list.
+    if(haunted() && !ended13 && Math.hypot(me.x - 2.5, me.z - (-20)) < 2.2){
+      ended13 = true;
+      flushSpooky();
+      Sfx.play('lose', 0.7);
+      stop();
+      ThirteenGame.start();
+      return;
+    }
 
     // expire speech bubbles
     const now = Date.now();
@@ -178,7 +264,11 @@ const HubWorld = (function(){
       pitch: -0.20
     };
 
-    Mini3D.sky(ctx, W, H, cam, {
+    Mini3D.sky(ctx, W, H, cam, haunted() ? {
+      focal: FOCAL,
+      skyTop: '#0a0510', skyBottom: '#2a1030',
+      groundNear: '#1d1226', groundFar: '#080410'
+    } : {
       focal: FOCAL,
       skyTop: '#070a12', skyBottom: '#1a2540',
       groundNear: '#16223a', groundFar: '#070a12'
@@ -197,10 +287,30 @@ const HubWorld = (function(){
     };
     coins.forEach(c => {
       if(c.taken) return;
-      const spin = frame * 0.05;
-      faces = faces.concat(Mini3D.transform(
-        Mini3D.box(0, 0, 0, 0.5, 0.5, 0.12, '#ffc857', { glow: '#ffc857', glowBlur: 14 }),
-        { x: c.x, y: 0.9 + Math.sin(frame*0.06 + c.x) * 0.12, z: c.z, yaw: spin }));
+      const y = 0.9 + Math.sin(frame*0.06 + c.x) * 0.12;
+      if(haunted()){
+        // a small pumpkin with a stalk, sat on the ground rather than spinning
+        faces = faces.concat(Mini3D.box(c.x, 0.42, c.z, 0.72, 0.62, 0.72, '#ff7518',
+                                        { glow: '#ff7518', glowBlur: 16 }));
+        faces = faces.concat(Mini3D.box(c.x, 0.82, c.z, 0.14, 0.24, 0.14, '#3d6b2e',
+                                        { stroke: 'rgba(0,0,0,0.3)' }));
+      } else {
+        faces = faces.concat(Mini3D.transform(
+          Mini3D.box(0, 0, 0, 0.5, 0.5, 0.12, '#ffc857', { glow: '#ffc857', glowBlur: 14 }),
+          { x: c.x, y, z: c.z, yaw: frame * 0.05 }));
+      }
+    });
+
+    ghosts.forEach(g => {
+      if(g.gone) return;
+      const y = 0.9 + Math.sin(g.bob) * 0.18;
+      const sheet = { glow: '#dfe9ff', glowBlur: 20, alpha: 0.72 };
+      const body = [];
+      body.push(...Mini3D.box(0, 0.42, 0, 0.86, 0.9, 0.7, '#e9f0ff', sheet));
+      body.push(...Mini3D.box(0, -0.12, 0, 0.7, 0.34, 0.6, '#cfdcf5', sheet));
+      body.push(...Mini3D.box(-0.17, 0.55, 0.36, 0.16, 0.2, 0.05, '#120c1c', { alpha: 0.9 }));
+      body.push(...Mini3D.box( 0.17, 0.55, 0.36, 0.16, 0.2, 0.05, '#120c1c', { alpha: 0.9 }));
+      faces = faces.concat(Mini3D.transform(body, { x: g.x, y, z: g.z, yaw: g.yaw }));
     });
 
     mpOthers().forEach(o => draw(o.user, o.p));
@@ -252,8 +362,13 @@ const HubWorld = (function(){
     ctx.fillText('WASD move · SHIFT sprint · SPACE jump · 1-4 emote', 14, H - 14);
     ctx.textAlign = 'right';
     ctx.fillText(`${mpPlayers.size} here · room ${mpRoom ? mpRoom.code : '—'}`, W - 14, H - 14);
-    ctx.fillStyle = '#ffc857';
-    ctx.fillText(`🪙 ${collected} collected`, W - 14, H - 30);
+    if(haunted()){
+      ctx.fillStyle = '#ff7518';
+      ctx.fillText(`🎃 ${collected}   👻 ${banished}`, W - 14, H - 30);
+    } else {
+      ctx.fillStyle = '#ffc857';
+      ctx.fillText(`🪙 ${collected} collected`, W - 14, H - 30);
+    }
     ctx.restore();
 
     drawHubMap();
@@ -288,6 +403,20 @@ const HubWorld = (function(){
     bubbles.set(user, { text, at: Date.now() });
   }
 
+  // Batched up and sent every couple of seconds, and again on the way out, so
+  // nothing collected is lost if you leave straight after picking it up.
+  function flushSpooky(){
+    if(!haunted()) return;
+    if(spookyPending.pumpkin > 0){
+      postSpooky('pumpkin', spookyPending.pumpkin);
+      spookyPending.pumpkin = 0;
+    }
+    if(spookyPending.ghost > 0){
+      postSpooky('ghost', spookyPending.ghost);
+      spookyPending.ghost = 0;
+    }
+  }
+
   function onKeyPress(name){
     const emotes = { '1': '👋', '2': '😂', '3': '🔥', '4': '❤️' };
     if(emotes[name]){
@@ -307,15 +436,20 @@ const HubWorld = (function(){
 
   function start(){
     showScreen('hub-screen');
-    if(!props.length) props = buildProps();
+    // Rebuilt each entry so a season change is picked up without a reload.
+    props = buildProps();
     spawnCoins();
-    collected = 0;
+    spawnGhosts();
+    collected = 0; banished = 0;
+    spookyPending = { pumpkin: 0, ghost: 0 };
+    ended13 = false;
     bubbles.clear();
     reset();
     paused = false; running = true;
     loop();
   }
   function stop(){
+    if(running) flushSpooky();
     running = false; paused = false;
     if(rafId) cancelAnimationFrame(rafId);
   }

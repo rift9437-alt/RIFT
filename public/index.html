@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="css/gazette.css">
 <link rel="stylesheet" href="css/avatar.css">
 <link rel="stylesheet" href="css/multiplayer.css">
+<link rel="stylesheet" href="css/season.css">
 </head>
 <body>
 <div class="scanlines"></div>
@@ -2119,6 +2120,24 @@
   <div class="clans-wrap" id="tournaments-body"></div>
 </div>
 
+<!-- ============ CABINET THIRTEEN (secret, Season 2) ============ -->
+<div id="thirteen-screen" class="screen game-screen hidden">
+  <div class="game-topbar">
+    <button class="back-btn" onclick="leaveMpWorld()">&larr; LEAVE</button>
+    <div class="game-title">🚪 ???</div>
+    <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
+  </div>
+  <div class="play-area" id="thirteen-play">
+    <canvas id="thirteen-canvas" width="860" height="500"></canvas>
+  </div>
+  <div class="result-overlay hidden" id="thirteen-result">
+    <h3 id="thirteen-result-text"></h3>
+    <p id="thirteen-result-sub"></p>
+    <button class="btn btn-pink" onclick="ThirteenGame.start()">Again</button>
+    <button class="btn btn-ghost" onclick="leaveMpWorld()">Leave</button>
+  </div>
+</div>
+
 <!-- ============ MULTIPLAYER LOBBY SCREEN ============ -->
 <div id="mp-screen" class="screen hidden">
   <div class="game-topbar" style="max-width:1000px;">
@@ -2259,6 +2278,7 @@
 <script src="js/games/runeduel.js"></script>
 <script src="js/games/warlord.js"></script>
 <script src="js/features/admin.js"></script>
+<script src="js/games/thirteen.js"></script>
 <script src="js/games/hubworld.js"></script>
 <script src="js/games/kart.js"></script>
 <script src="js/games/evolution.js"></script>
