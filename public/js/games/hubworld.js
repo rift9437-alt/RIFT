@@ -24,6 +24,12 @@ const HubWorld = (function(){
   let camYaw = 0, camDist = 5.6, camHeight = 2.6;
   let frame = 0;
   let props = [];
+  let coins = [];
+  let collected = 0;
+  // Speech bubbles keyed by player, fed from the chat room so what you say
+  // in chat also appears over your head in here.
+  const bubbles = new Map();
+  const BUBBLE_MS = 6000;
 
   // The scenery, built once. Everything is boxes, so it costs nothing to
   // keep around and can be sorted with the players in one pass.
@@ -74,6 +80,18 @@ const HubWorld = (function(){
     });
 
     return out;
+  }
+
+  // Tokens scattered round the plaza. They respawn on a timer rather than
+  // being a one-off, so there's always something to chase, and they pay
+  // through the normal earn path so the caps still apply.
+  function spawnCoins(){
+    coins = [];
+    for(let i=0;i<10;i++){
+      const a = (i/10) * Math.PI*2 + Math.random()*0.4;
+      const r = 8 + Math.random()*13;
+      coins.push({ x: Math.cos(a)*r, z: Math.sin(a)*r, taken: 0 });
+    }
   }
 
   function reset(){
@@ -129,6 +147,24 @@ const HubWorld = (function(){
     while(d < -Math.PI) d += Math.PI*2;
     camYaw += d * 0.12;
 
+    // coins
+    coins.forEach(c => {
+      if(c.taken){
+        if(frame - c.taken > 600) c.taken = 0;   // ten seconds, then it's back
+        return;
+      }
+      if(Math.hypot(c.x - me.x, c.z - me.z) < 1.2){
+        c.taken = frame;
+        collected++;
+        Sfx.play('coin', 1.4);
+        earnTokens('hub_coin', 1);
+      }
+    });
+
+    // expire speech bubbles
+    const now = Date.now();
+    bubbles.forEach((b, user) => { if(now - b.at > BUBBLE_MS) bubbles.delete(user); });
+
     mpInterpolate();
   }
 
@@ -159,6 +195,14 @@ const HubWorld = (function(){
       }));
       tags.push({ user, p });
     };
+    coins.forEach(c => {
+      if(c.taken) return;
+      const spin = frame * 0.05;
+      faces = faces.concat(Mini3D.transform(
+        Mini3D.box(0, 0, 0, 0.5, 0.5, 0.12, '#ffc857', { glow: '#ffc857', glowBlur: 14 }),
+        { x: c.x, y: 0.9 + Math.sin(frame*0.06 + c.x) * 0.12, z: c.z, yaw: spin }));
+    });
+
     mpOthers().forEach(o => draw(o.user, o.p));
     draw(currentUser, me);
 
@@ -187,6 +231,16 @@ const HubWorld = (function(){
         ctx.font = '24px sans-serif';
         ctx.fillText(p.emote, head.x, head.y - 22);
       }
+      const bubble = bubbles.get(user);
+      if(bubble){
+        ctx.font = '11px "JetBrains Mono", monospace';
+        const bw = Math.min(220, ctx.measureText(bubble.text).width + 16);
+        const by = head.y - (p.emote ? 46 : 22);
+        ctx.fillStyle = 'rgba(232,236,241,0.94)';
+        ctx.beginPath(); ctx.roundRect(head.x - bw/2, by - 16, bw, 21, 7); ctx.fill();
+        ctx.fillStyle = '#0b0f17';
+        ctx.fillText(bubble.text.slice(0, 34), head.x, by - 2);
+      }
       ctx.restore();
     });
 
@@ -198,7 +252,40 @@ const HubWorld = (function(){
     ctx.fillText('WASD move · SHIFT sprint · SPACE jump · 1-4 emote', 14, H - 14);
     ctx.textAlign = 'right';
     ctx.fillText(`${mpPlayers.size} here · room ${mpRoom ? mpRoom.code : '—'}`, W - 14, H - 14);
+    ctx.fillStyle = '#ffc857';
+    ctx.fillText(`🪙 ${collected} collected`, W - 14, H - 30);
     ctx.restore();
+
+    drawHubMap();
+  }
+
+  // Top-down plaza so you can find the others without wandering.
+  function drawHubMap(){
+    const size = 96, pad = 14;
+    const cx = W - size/2 - pad, cy = pad + size/2;
+    const scale = (size/2 - 6) / WORLD_R;
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,9,15,0.5)';
+    ctx.beginPath(); ctx.arc(cx, cy, size/2, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(232,236,241,0.25)';
+    ctx.beginPath(); ctx.arc(cx, cy, size/2 - 4, 0, Math.PI*2); ctx.stroke();
+    coins.forEach(c => {
+      if(c.taken) return;
+      ctx.fillStyle = 'rgba(255,200,87,0.85)';
+      ctx.fillRect(cx + c.x*scale - 1, cy + c.z*scale - 1, 2, 2);
+    });
+    mpPlayers.forEach((p, user) => {
+      ctx.fillStyle = user === currentUser ? '#2de2c5' : '#ff3d8a';
+      ctx.beginPath();
+      ctx.arc(cx + p.x*scale, cy + p.z*scale, user === currentUser ? 3.5 : 2.5, 0, Math.PI*2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // Chat lands over people's heads in here as well as in the dock.
+  function sayInWorld(user, text){
+    bubbles.set(user, { text, at: Date.now() });
   }
 
   function onKeyPress(name){
@@ -221,6 +308,9 @@ const HubWorld = (function(){
   function start(){
     showScreen('hub-screen');
     if(!props.length) props = buildProps();
+    spawnCoins();
+    collected = 0;
+    bubbles.clear();
     reset();
     paused = false; running = true;
     loop();
@@ -234,5 +324,5 @@ const HubWorld = (function(){
   function isPaused(){ return paused; }
   function isRunning(){ return running; }
 
-  return { start, stop, reset, onKeyPress, pause, resume, isPaused, isRunning };
+  return { start, stop, reset, onKeyPress, pause, resume, isPaused, isRunning, sayInWorld };
 })();

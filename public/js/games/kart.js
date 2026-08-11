@@ -24,7 +24,25 @@ const KartGame = (function(){
   const DRAG = 0.985;
   const MAX_SPEED = 0.42;
   const TURN_RATE = 0.034;
-  const OFFTRACK_DRAG = 0.93;
+  // Leaving the tarmac should cost you a place, not end your race. At 0.93 a
+  // frame it compounded into a hard stop — a kart that wandered off settled
+  // at under a third of its top speed and never recovered.
+  const OFFTRACK_DRAG = 0.972;
+  // Drift: hold SHIFT while turning to slide wide, and the longer you hold a
+  // clean slide the bigger the kick when you let go. It's the one mechanic
+  // that rewards taking a corner well rather than just holding throttle.
+  const DRIFT_TURN = 1.75;        // steering multiplier while sliding
+  // Scrubbing 3.5% a frame compounded to losing ~80% of your speed over a
+  // tier-1 slide — you paid more than the boost ever gave back, so drifting
+  // was strictly worse than just holding the throttle. It's a light cost now.
+  const DRIFT_GRIP = 0.997;
+  const MINI_TURBO_AT = [45, 90]; // frames of clean drift for each tier
+  // A boost is a burst you can feel: an immediate kick past the normal top
+  // speed, then a window where the ceiling stays raised. Trickling extra
+  // acceleration in was indistinguishable from just holding the throttle.
+  const BOOST_FRAMES = [70, 100]; // how long the raised ceiling lasts
+  const BOOST_KICK = [1.20, 1.38];// multiple of MAX_SPEED applied instantly
+  const BOOST_CAP = 1.45;         // ceiling while a boost is live
 
   // The circuit centreline. Checkpoints are evenly spaced around it, and the
   // road is drawn as quads between consecutive points.
@@ -38,6 +56,8 @@ const KartGame = (function(){
   let speed = 0, frame = 0, camYaw = 0;
   let myCheckpoint = 0, myLap = 0, finished = false;
   let raceStart = 0, lastLapAt = 0, bestLap = 0;
+  let drift = 0, driftDir = 0, boost = 0, boostPads = [];
+  let lapTimes = [];
 
   // A closed loop with a couple of kinks, so it isn't a plain circle.
   function trackPoint(t){
@@ -93,6 +113,26 @@ const KartGame = (function(){
         scenery.push(...Mini3D.box(px, 2.4, pz, 0.6, 0.4, 0.6, c,
                                    { glow: c, glowBlur: 14, fog: 90 }));
       }
+    }
+
+    // Boost pads on the racing line, spaced so there's one to aim for on
+    // most straights rather than a carpet of them.
+    boostPads = [];
+    for(let i=8;i<NODES;i+=16){
+      const a = centre[i], b = centre[(i+1) % NODES];
+      const dxp = b.x - a.x, dzp = b.z - a.z;
+      const lp = Math.hypot(dxp, dzp) || 1;
+      const nxp = -dzp/lp, nzp = dxp/lp;
+      boostPads.push({ x: a.x, z: a.z });
+      trackFaces.push({
+        pts: [
+          { x: a.x + nxp*2.2, y: 0.04, z: a.z + nzp*2.2 },
+          { x: a.x - nxp*2.2, y: 0.04, z: a.z - nzp*2.2 },
+          { x: a.x - nxp*2.2 + dxp/lp*3.4, y: 0.04, z: a.z - nzp*2.2 + dzp/lp*3.4 },
+          { x: a.x + nxp*2.2 + dxp/lp*3.4, y: 0.04, z: a.z + nzp*2.2 + dzp/lp*3.4 }
+        ],
+        fill: '#45ffb0', glow: '#45ffb0', glowBlur: 16, alpha: 0.75, fog: 90
+      });
     }
 
     // start/finish gantry across the line
@@ -164,7 +204,10 @@ const KartGame = (function(){
 
   function reset(){
     const me = mpLocal();
+    hideKartResults();
     speed = 0;
+    drift = 0; driftDir = 0; boost = 0;
+    lapTimes = [];
     myCheckpoint = 0; myLap = 0; finished = false;
     bestLap = 0; lastLapAt = 0;
     // Position comes from the server's grid — see needsSpawn in
@@ -172,6 +215,27 @@ const KartGame = (function(){
     me.phase = 0; me.moving = false;
     camYaw = me.yaw;
     frame = 0;
+  }
+
+  // Cashing in a slide. Two tiers, so a long committed drift out of a hairpin
+  // is worth more than a flick.
+  function releaseDrift(){
+    let tier = -1;
+    if(drift >= MINI_TURBO_AT[1]) tier = 1;
+    else if(drift >= MINI_TURBO_AT[0]) tier = 0;
+    if(tier >= 0){
+      applyBoost(tier);
+      Sfx.play(tier === 1 ? 'perfect' : 'coin', 1.3);
+    }
+    drift = 0; driftDir = 0;
+  }
+
+  // tier 0 = pad or short drift, tier 1 = long drift
+  function applyBoost(tier){
+    const frames = BOOST_FRAMES[tier] || BOOST_FRAMES[0];
+    if(boost <= 0) Sfx.play('whoosh');
+    boost = Math.max(boost, frames);
+    speed = Math.max(speed, MAX_SPEED * (BOOST_KICK[tier] || BOOST_KICK[0]));
   }
 
   function countdownLeft(){
@@ -189,13 +253,44 @@ const KartGame = (function(){
       // Steering bites less at a crawl, so you can't pirouette on the spot.
       const grip = Math.min(1, Math.abs(speed) / 0.12);
       const dir = speed >= 0 ? 1 : -1;
-      if(keys.has('a') || keys.has('arrowleft')) me.yaw -= TURN_RATE * grip * dir;
-      if(keys.has('d') || keys.has('arrowright')) me.yaw += TURN_RATE * grip * dir;
+      const turning = (keys.has('a') || keys.has('arrowleft')) ? -1
+                    : (keys.has('d') || keys.has('arrowright')) ? 1 : 0;
+      const wantDrift = keys.has('shift') && turning !== 0 && Math.abs(speed) > 0.16;
+
+      if(wantDrift){
+        // A slide only counts while you keep turning the same way, so
+        // flicking left-right doesn't farm boost.
+        if(drift === 0 || driftDir === turning){
+          driftDir = turning;
+          drift++;
+        } else {
+          drift = 0; driftDir = turning;
+        }
+        me.yaw += TURN_RATE * DRIFT_TURN * turning * dir;
+        speed *= DRIFT_GRIP;
+      } else {
+        if(drift > 0) releaseDrift();
+        me.yaw += TURN_RATE * grip * turning * dir;
+      }
+    } else {
+      drift = 0;
     }
 
     speed *= DRAG;
-    speed = Math.max(-MAX_SPEED*0.4, Math.min(MAX_SPEED, speed));
+    if(boost > 0) boost--;
+    const cap = boost > 0 ? MAX_SPEED * BOOST_CAP : MAX_SPEED;
+    speed = Math.max(-MAX_SPEED*0.4, Math.min(cap, speed));
     if(locked) speed *= 0.9;
+
+    // Boost pads
+    if(!locked){
+      for(const pad of boostPads){
+        if(Math.hypot(pad.x - me.x, pad.z - me.z) < 2.8){
+          applyBoost(0);
+          break;
+        }
+      }
+    }
 
     // Off the tarmac you bog down — a shortcut across the infield costs you.
     const off = distanceToTrack(me.x, me.z);
@@ -203,6 +298,10 @@ const KartGame = (function(){
 
     me.x += Math.sin(me.yaw) * speed;
     me.z += Math.cos(me.yaw) * speed;
+    // Published on the shared player record so anything that cares how fast
+    // a kart is going — the HUD, engine pitch — reads one number.
+    me.speed = speed;
+    me.boosting = boost > 0;
     me.moving = Math.abs(speed) > 0.02;
     me.phase = 0;
 
@@ -219,12 +318,14 @@ const KartGame = (function(){
           const now = Date.now();
           if(lastLapAt){
             const lap = now - lastLapAt;
+            lapTimes.push(lap);
             if(!bestLap || lap < bestLap) bestLap = lap;
           }
           lastLapAt = now;
           if(myLap >= LAPS){
             finished = true;
             Sfx.play('win');
+            showKartResults();
           } else {
             Sfx.play('perfect');
             toast('Lap ' + myLap, `${LAPS - myLap} to go`, '🏁', 'cyan');
@@ -297,6 +398,10 @@ const KartGame = (function(){
     ctx.fillStyle = 'rgba(232,236,241,0.7)';
     ctx.font = '11px "JetBrains Mono", monospace';
     ctx.fillText(`${Math.round(Math.abs(speed) * 240)} km/h`, 16, 46);
+    if(boost > 0){
+      ctx.fillStyle = '#45ffb0';
+      ctx.fillText('BOOST', 16, 78);
+    }
     if(bestLap) ctx.fillText(`best ${(bestLap/1000).toFixed(1)}s`, 16, 62);
 
     // running order, by laps then checkpoint progress
@@ -330,14 +435,95 @@ const KartGame = (function(){
       ctx.shadowColor = '#ffc857'; ctx.shadowBlur = 20;
       ctx.fillText('FINISHED', W/2, 80);
     }
-
     ctx.restore();
+
+    drawDriftMeter();
+    drawMinimap();
     ctx.save();
     ctx.font = '11px "JetBrains Mono", monospace';
     ctx.fillStyle = 'rgba(232,236,241,0.5)';
     ctx.textAlign = 'left';
-    ctx.fillText('W accelerate · S brake · A/D steer', 16, H - 14);
+    ctx.fillText('W accelerate · S brake · A/D steer · SHIFT drift', 16, H - 14);
     ctx.restore();
+  }
+
+  // Charge bar for the current slide, so the two mini-turbo tiers are
+  // something you can see coming rather than guess at.
+  function drawDriftMeter(){
+    if(drift <= 0 && boost <= 0) return;
+    const x = W/2 - 60, y = H - 46;
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,9,15,0.6)';
+    ctx.beginPath(); ctx.roundRect(x, y, 120, 9, 5); ctx.fill();
+    const t = Math.min(1, drift / MINI_TURBO_AT[1]);
+    const tier = drift >= MINI_TURBO_AT[1] ? 2 : drift >= MINI_TURBO_AT[0] ? 1 : 0;
+    ctx.fillStyle = boost > 0 ? '#45ffb0' : tier === 2 ? '#ff3d8a' : tier === 1 ? '#ffc857' : '#7dd3ff';
+    ctx.beginPath();
+    ctx.roundRect(x, y, 120 * (boost > 0 ? 1 : t), 9, 5);
+    ctx.fill();
+    ctx.font = '9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(232,236,241,0.75)';
+    ctx.fillText(boost > 0 ? 'BOOST' : tier ? 'MINI-TURBO READY' : 'DRIFTING', W/2, y - 4);
+    ctx.restore();
+  }
+
+  // Top-down circuit with everyone on it, so you can see who's where without
+  // spinning the camera round.
+  function drawMinimap(){
+    const size = 108, pad = 14;
+    const cx = W - size/2 - pad, cy = H - size/2 - pad;
+    const scale = (size/2 - 8) / (TRACK_R + 10);
+    ctx.save();
+    ctx.fillStyle = 'rgba(6,9,15,0.55)';
+    ctx.beginPath(); ctx.arc(cx, cy, size/2, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(232,236,241,0.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    centre.forEach((p, i) => {
+      const px = cx + p.x*scale, py = cy + p.z*scale;
+      if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    mpPlayers.forEach((p, user) => {
+      ctx.fillStyle = user === currentUser ? '#2de2c5' : '#ff3d8a';
+      ctx.beginPath();
+      ctx.arc(cx + p.x*scale, cy + p.z*scale, user === currentUser ? 3.5 : 2.5, 0, Math.PI*2);
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // Results are shown from what the server told us — mp:finish carries the
+  // place and time — so the board can't disagree with what was paid out.
+  function showKartResults(){
+    const box = document.getElementById('kart-result');
+    if(!box) return;
+    const mine = mpFinishOrder.find(f => f.user === currentUser);
+    document.getElementById('kart-result-text').textContent =
+      mine ? (mine.place === 1 ? '🏆 WINNER' : `P${mine.place}`) : 'FINISHED';
+    document.getElementById('kart-result-sub').textContent =
+      mine ? `${(mine.time/1000).toFixed(1)}s · best lap ${(bestLap/1000).toFixed(1)}s`
+           : `best lap ${(bestLap/1000).toFixed(1)}s`;
+    document.getElementById('kart-result-board').innerHTML = `
+      <table class="trn-table">
+        <tr><th>#</th><th>Player</th><th>Time</th></tr>
+        ${mpFinishOrder.map(f => `
+          <tr class="${f.user === currentUser ? 'trn-me' : ''}">
+            <td>${f.place === 1 ? '🥇' : f.place === 2 ? '🥈' : f.place === 3 ? '🥉' : f.place}</td>
+            <td>${f.user}</td>
+            <td>${(f.time/1000).toFixed(1)}s</td>
+          </tr>`).join('')}
+      </table>
+      ${lapTimes.length ? `<div class="trn-empty">Your laps: ${
+        lapTimes.map(t => (t/1000).toFixed(1) + 's').join(' · ')}</div>` : ''}`;
+    box.classList.remove('hidden');
+  }
+
+  function hideKartResults(){
+    const box = document.getElementById('kart-result');
+    if(box) box.classList.add('hidden');
   }
 
   function onKeyPress(){}

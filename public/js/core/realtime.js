@@ -211,8 +211,11 @@ const Realtime = (function(){
    polling path, so there's one way for each kind of update to be applied. */
 
 Realtime.on('chat', payload => {
-  if(payload && payload.message && typeof ingestChatMessages === 'function'){
-    ingestChatMessages([payload.message], false);
+  if(!payload || !payload.message) return;
+  if(typeof ingestChatMessages === 'function') ingestChatMessages([payload.message], false);
+  // Standing in the hub, what people say also appears over their heads.
+  if(currentScreen === 'hub-screen' && typeof HubWorld !== 'undefined'){
+    HubWorld.sayInWorld(payload.message.user, payload.message.text);
   }
 });
 

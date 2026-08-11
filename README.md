@@ -239,6 +239,42 @@ Three of them are actually 3D, with no libraries and no WebGL:
 Both approaches share the arcade's flat-neon look and stay comfortably at
 60fps on a normal laptop.
 
+## Avatars and multiplayer
+
+Three pieces that build on each other, all on the same software renderer the
+3D cabinets use — no WebGL, no libraries.
+
+**Your avatar** is a blocky character built from `Mini3D` boxes: skin, shirt,
+trousers, shoes and a hat, edited on a turntable you can drag. The same model
+is what other players see in the shared world and sitting in your kart. The
+walk cycle runs off a phase the caller advances rather than an internal
+clock, so a remote player animates from the movement actually received for
+them. Appearance is validated server-side — six-digit hex and a known hat id
+or the save is rejected — because it renders inside everyone else's client.
+A player who has never opened the editor gets a look seeded from their name,
+so they're still a distinct character rather than a shared default.
+
+**Rooms** have a four-character code, are public or private, and hold up to
+eight. Create and join over REST; once you're in, positions relay over the
+WebSocket at ~17Hz and remote players are interpolated toward the last
+snapshot so the tick rate doesn't show. Your own movement is applied locally
+and immediately — you never wait on the network to move.
+
+The server relays rather than simulates, which is the right trade for a
+private arcade, but it still owns everything that persists: a lap only
+counts if the checkpoint you claimed is the one you were due, and finishing
+pays through the same wallet path as every other game.
+
+**The Hub** is a plaza you walk around with everyone else in the room —
+sprint, jump, emotes, name tags carrying your clan tag, tokens to collect,
+a minimap, and chat that appears over your head as well as in the dock.
+
+**Rift Kart** is three laps of a circuit with kerbs, a start grid and a
+gantry. Hold SHIFT through a corner to drift; a long clean slide earns a
+mini-turbo that pushes you past your own top speed. Boost pads sit on the
+racing line, and there's a minimap, a live running order and a results board
+built from what the server actually paid out.
+
 ## Tournaments
 
 A timed contest on one cabinet's stat, started from the admin panel with a

@@ -227,7 +227,8 @@ const REASON_QTY_CAPS = {
   burger_order: 1,
   tag_win: 1, tag_loss: 1,
   robot_win: 1,
-  kart_win: 1, kart_finish: 1
+  kart_win: 1, kart_finish: 1,
+  hub_coin: 1
 };
 
 const DEFAULT_STATS = {
@@ -311,7 +312,8 @@ const REWARDS = {
   tag_win: 20, tag_loss: 5,
   robot_win: 15,          // per arena round won
   kart_win: 40,           // first across the line
-  kart_finish: 12         // anywhere else on the podium sheet
+  kart_finish: 12,        // anywhere else on the podium sheet
+  hub_coin: 2             // a token picked up in the hub
 };
 
 const SHOP_ITEMS = {
