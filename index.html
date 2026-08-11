@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Level 7</title>
+
+<!--
+  The playable site lives in public/. GitHub Pages can serve it two ways and
+  this file makes both work:
+
+  * Source = "Deploy from a branch"  — Pages publishes the whole branch, so
+    the game is already up at /public/. There's no index.html at the repo
+    root, which is what this file fixes: it bounces / to /public/.
+
+  * Source = "GitHub Actions"        — .github/workflows/pages.yml uploads
+    the *contents* of public/ as the site root, so the game is at / and this
+    file isn't part of the artifact at all. Nothing to collide with.
+
+  Either way the root URL lands on the game. Switching to GitHub Actions is
+  the tidier of the two (no /public/ in the address bar, and a working
+  404 fallback for deep links), but nothing here depends on it.
+-->
+<link rel="canonical" href="public/">
+<meta http-equiv="refresh" content="0; url=public/">
+<script>
+  // Carry over ?api= and any #hash so a hand-tweaked link survives the hop.
+  location.replace('public/' + location.search + location.hash);
+</script>
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: #0a0d13;
+    color: #e8ecf1;
+    font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  main {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    text-align: center;
+    padding: 24px;
+    box-sizing: border-box;
+  }
+  h1 { font-size: 20px; letter-spacing: 4px; margin: 0; color: #2de2c5; }
+  p  { font-size: 12px; color: #8b94a7; margin: 0; }
+  a  {
+    color: #0a0d13;
+    background: #2de2c5;
+    text-decoration: none;
+    font-size: 13px;
+    padding: 11px 22px;
+    border-radius: 8px;
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>LEVEL 7</h1>
+    <p>Opening the arcade&hellip;</p>
+    <a href="public/">Enter</a>
+  </main>
+</body>
+</html>
