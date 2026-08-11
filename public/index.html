@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="css/avatar.css">
 <link rel="stylesheet" href="css/multiplayer.css">
 <link rel="stylesheet" href="css/season.css">
+<link rel="stylesheet" href="css/robot.css">
 </head>
 <body>
 <div class="scanlines"></div>
@@ -1953,37 +1954,15 @@
     <button class="pause-btn" onclick="togglePauseCurrentGame()" title="Pause">⏸</button>
   </div>
   <div class="setup-panel" id="robot-setup">
-    <div class="setup-section-label">Chassis</div>
-    <div class="option-row">
-      <button class="option-btn" id="robot-chassis-light" onclick="RobotGame.setPart('chassis','light')">Light</button>
-      <button class="option-btn selected" id="robot-chassis-medium" onclick="RobotGame.setPart('chassis','medium')">Medium</button>
-      <button class="option-btn" id="robot-chassis-heavy" onclick="RobotGame.setPart('chassis','heavy')">Heavy</button>
-    </div>
-    <div class="setup-section-label">Weapon</div>
-    <div class="option-row">
-      <button class="option-btn selected" id="robot-weapon-laser" onclick="RobotGame.setPart('weapon','laser')">Laser</button>
-      <button class="option-btn" id="robot-weapon-cannon" onclick="RobotGame.setPart('weapon','cannon')">Cannon</button>
-      <button class="option-btn" id="robot-weapon-shotgun" onclick="RobotGame.setPart('weapon','shotgun')">Scatter</button>
-    </div>
-    <div class="setup-section-label">Core</div>
-    <div class="option-row">
-      <button class="option-btn selected" id="robot-core-power" onclick="RobotGame.setPart('core','power')">Power</button>
-      <button class="option-btn" id="robot-core-guard" onclick="RobotGame.setPart('core','guard')">Guard</button>
-      <button class="option-btn" id="robot-core-turbo" onclick="RobotGame.setPart('core','turbo')">Turbo</button>
-    </div>
-    <div class="setup-section-label">Opponent Skill</div>
-    <div class="option-row">
-      <button class="option-btn selected" id="robot-diff-easy" onclick="RobotGame.setDifficulty('easy')">Easy</button>
-      <button class="option-btn" id="robot-diff-medium" onclick="RobotGame.setDifficulty('medium')">Medium</button>
-      <button class="option-btn" id="robot-diff-hard" onclick="RobotGame.setDifficulty('hard')">Hard</button>
-    </div>
-    <div class="shop-balance-row"><span>YOUR BUILD</span></div>
-    <div id="robot-preview" style="font-family:var(--font-mono); margin-bottom:16px;"></div>
     <div class="controls-box">
-      <b>W/S</b> drive &middot; <b>A/D</b> turn &middot; <b>SPACE</b> fire.<br>
-      The dashed line is your barrel &mdash; it turns green and rings the target when you're
-      lined up. Beat a robot and a tougher one rolls in; damage carries between rounds, and
-      a win patches you up by a quarter of your hull.
+      <b>W/S</b> drive &middot; <b>A/D</b> turn &middot; <b>SPACE</b> fire &middot; <b>1-5</b> abilities.<br>
+      You don't choose a loadout &mdash; you're handed one. Every part is rolled with its own
+      stats and rarity, and the good ones often come with something wrong with them.
+      Win a round and you draft one of three new parts.<br>
+      Parts are physical: each is bolted to your chassis and holds a slice of your hit points.
+      Lose the part and you lose what it was giving you, so a wrecked thruster really does
+      make you turn worse.<br>
+      Certain combinations unlock an <b>ability</b>, listed down the left with its cooldown.
     </div>
     <button class="btn btn-primary" onclick="RobotGame.start()">Enter the Arena</button>
   </div>
@@ -2000,6 +1979,11 @@
       </div>
     </div>
     <canvas id="robot-canvas" width="760" height="480"></canvas>
+  </div>
+  <div class="hidden" id="robot-draft">
+    <div class="draft-head">SALVAGE &mdash; TAKE ONE</div>
+    <div id="robot-draft-cards"></div>
+    <div class="draft-hint" id="robot-draft-hint"></div>
   </div>
   <div class="result-overlay hidden" id="robot-result">
     <h3 id="robot-result-text">DESTROYED</h3>

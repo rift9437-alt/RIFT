@@ -1,0 +1,91 @@
+/* =========================================================
+   ROBOT ARENA — the salvage draft
+   ========================================================= */
+#robot-draft {
+  width: 100%;
+  max-width: 780px;
+  margin: 14px auto 0;
+  padding: 0 12px;
+}
+.draft-head {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--gold);
+  text-align: center;
+  margin-bottom: 12px;
+}
+#robot-draft-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.part-card {
+  --rar: var(--text-dim);
+  background: var(--bg-panel);
+  border: 1px solid var(--rar);
+  border-radius: 12px;
+  padding: 14px 12px;
+  cursor: pointer;
+  text-align: center;
+  color: var(--text);
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.part-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--rar) inset;
+}
+.rar-common    { --rar: #9aa4b4; }
+.rar-uncommon  { --rar: #45ffb0; }
+.rar-rare      { --rar: #7dd3ff; }
+.rar-epic      { --rar: #c084fc; }
+.rar-legendary { --rar: #ffc857; box-shadow: 0 0 18px rgba(255, 200, 87, 0.22); }
+
+.part-rarity {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.part-icon { font-size: 26px; line-height: 1; }
+.part-name { font-size: 12px; font-weight: 600; }
+.part-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.part-stats .up { color: var(--cyan); }
+.part-stats .down { color: var(--pink); }
+.part-debuff {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--pink);
+  border-top: 1px dashed var(--border);
+  padding-top: 5px;
+}
+.part-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.draft-hint {
+  margin-top: 10px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--gold);
+  min-height: 14px;
+}
+
+@media (max-width: 620px) {
+  #robot-draft-cards { grid-template-columns: 1fr; }
+}
