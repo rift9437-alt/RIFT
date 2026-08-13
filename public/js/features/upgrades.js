@@ -281,9 +281,110 @@ const LB_BOARDS = [
   { game:'whodidit',  title:'🔍 Who Did It?',      cols:[['solved','Cases Solved']] }
 ];
 
+/* =========================================================
+   LEADERBOARD SCOPE + HEAD TO HEAD
+   ========================================================= */
+let lbScope = 'all';          // 'all' | 'friends' | 'clan'
+let h2hOpponent = null;
+
+// Falls back to everyone rather than showing an empty board: a friends filter
+// with no friends is a blank screen with no way out of it.
+function lbScopedUsers(){
+  if(lbScope === 'friends'){
+    const friends = (wallet && wallet.friends) || [];
+    if(friends.length) return [...new Set(friends.concat([currentUser]))].filter(u => USERS.includes(u));
+  }
+  if(lbScope === 'clan' && typeof myClan === 'function'){
+    const mine = myClan();
+    if(mine && mine.members && mine.members.length){
+      return mine.members.map(m => m.user).filter(u => USERS.includes(u));
+    }
+  }
+  return USERS;
+}
+
+function setLbScope(scope){
+  lbScope = scope;
+  h2hOpponent = null;
+  renderLeaderboard();
+}
+
+function lbScopeBar(){
+  const friends = ((wallet && wallet.friends) || []).length;
+  const clan = (typeof myClan === 'function' && myClan()) || null;
+  const chip = (id, label, ok) =>
+    `<button class="filter-chip ${lbScope === id ? 'active' : ''}" ${ok ? '' : 'disabled title="Nothing to filter by yet"'}
+             onclick="setLbScope('${id}')">${label}</button>`;
+  return `
+    <div class="dash-toolbar" style="margin-bottom:14px;">
+      ${chip('all', 'Everyone', true)}
+      ${chip('friends', `Friends${friends ? ' · ' + friends : ''}`, friends > 0)}
+      ${chip('clan', clan ? `Clan · ${escapeHtml(clan.tag)}` : 'Clan', !!clan)}
+      <select class="clan-input" style="margin:0; max-width:220px; margin-left:auto;"
+              onchange="openHeadToHead(this.value)">
+        <option value="">Compare me with…</option>
+        ${USERS.filter(u => u !== currentUser)
+               .map(u => `<option value="${escapeHtml(u)}" ${h2hOpponent === u ? 'selected' : ''}>${escapeHtml(u)}</option>`).join('')}
+      </select>
+    </div>`;
+}
+
+/* Head to head: you against one other player across every cabinet, with the
+   per-cabinet winner called. A ranked table answers "who's best"; this
+   answers "am I beating them", which is the question people actually have. */
+function openHeadToHead(user){
+  h2hOpponent = USERS.includes(user) ? user : null;
+  renderLeaderboard();
+}
+
+function headToHeadCard(data){
+  if(!h2hOpponent) return '';
+  const me = currentUser, them = h2hOpponent;
+  let myWins = 0, theirWins = 0;
+  const rows = LB_BOARDS.map(board => {
+    const key = board.cols[0][0];
+    const a = ((data[me] && data[me][board.game]) || {})[key] || 0;
+    const b = ((data[them] && data[them][board.game]) || {})[key] || 0;
+    // Nobody has touched this cabinet — nothing to compare, so it doesn't
+    // count for either side.
+    if(!a && !b) return { skip: true };
+    if(a > b) myWins++; else if(b > a) theirWins++;
+    return {
+      title: board.title, label: board.cols[0][1], a, b,
+      lead: a > b ? 'a' : b > a ? 'b' : 'tie'
+    };
+  }).filter(r => !r.skip);
+
+  const verdict = myWins > theirWins ? `You lead ${myWins}–${theirWins}`
+                : theirWins > myWins ? `${escapeHtml(them)} leads ${theirWins}–${myWins}`
+                : `Dead even at ${myWins}–${theirWins}`;
+  return `
+    <div class="lb-card" style="grid-column:1/-1;">
+      <h3>⚔ ${escapeHtml(me)} vs ${escapeHtml(them)}
+        <span style="font-family:var(--font-mono); font-size:11px; color:var(--gold); letter-spacing:1px;">${verdict}</span>
+      </h3>
+      ${rows.length ? `
+      <table class="h2h-table">
+        <tr><th>Cabinet</th><th>${escapeHtml(me)}</th><th>${escapeHtml(them)}</th></tr>
+        ${rows.map(r => `
+          <tr>
+            <td>${r.title}<i>${r.label}</i></td>
+            <td class="${r.lead === 'a' ? 'h2h-win' : r.lead === 'tie' ? 'h2h-tie' : ''}">${r.a.toLocaleString('en-GB')}</td>
+            <td class="${r.lead === 'b' ? 'h2h-win' : r.lead === 'tie' ? 'h2h-tie' : ''}">${r.b.toLocaleString('en-GB')}</td>
+          </tr>`).join('')}
+      </table>`
+      : '<div class="clan-empty">Neither of you has put a number on any cabinet yet.</div>'}
+    </div>`;
+}
+
 async function renderLeaderboard(){
   const data = await loadLeaderboard();
   const grid = document.getElementById('lb-grid');
+
+  // Who the board is showing. Ten names is already a lot to scan for your own
+  // when what you actually want to know is whether you're ahead of the three
+  // people you play with.
+  const scoped = lbScopedUsers();
 
   function rankRows(rowsArr, cols){
     return rowsArr.map((r,i)=>{
@@ -297,7 +398,7 @@ async function renderLeaderboard(){
 
   function boardRows(board){
     const keys = board.cols.map(c=>c[0]);
-    return USERS.map(u=>{
+    return scoped.map(u=>{
       const rec = (data[u] && data[u][board.game]) || {};
       const row = { name:u };
       keys.forEach(k=>{ row[k] = rec[k] || 0; });
@@ -313,7 +414,7 @@ async function renderLeaderboard(){
   // Arcade Champion: 3 points for topping a board, 2 for second, 1 for third.
   // Only counts players who actually put a number on the board.
   const points = {};
-  USERS.forEach(u=>{ points[u] = { name:u, points:0, golds:0 }; });
+  scoped.forEach(u=>{ points[u] = { name:u, points:0, golds:0 }; });
   LB_BOARDS.forEach(board=>{
     const rows = boardRows(board);
     const primary = board.cols[0][0];
@@ -335,7 +436,7 @@ async function renderLeaderboard(){
     </div>
   `;
 
-  grid.innerHTML = championCard + LB_BOARDS.map(board=>`
+  grid.innerHTML = lbScopeBar() + headToHeadCard(data) + championCard + LB_BOARDS.map(board=>`
     <div class="lb-card">
       <h3>${board.title}</h3>
       <table>

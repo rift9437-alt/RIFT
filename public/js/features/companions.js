@@ -471,6 +471,33 @@ setInterval(()=>{
 
 // reason: a key into the server's REWARDS table (e.g. 'soccer_win').
 // qty: how many times it happened (e.g. number of goals). Defaults to 1.
+// Spending that isn't a shop purchase. The server owns the price — the client
+// only says what it wants and how far into the run it is — so this returns
+// whether it actually went through rather than assuming it did.
+async function spendTokens(reason, scale){
+  if(!currentUser) return false;
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/wallet/spend`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser, reason, n: scale })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok){
+      if(typeof toast === 'function' && data.error === 'Not enough tokens'){
+        toast('Not enough tokens', `That costs ${data.cost}`, '🪙', 'pink');
+      }
+      return false;
+    }
+    wallet = data.wallet;
+    updateTokenDisplay();
+    return true;
+  }catch(e){
+    console.error('Spend failed:', e);
+    return false;
+  }
+}
+
 async function earnTokens(reason, qty){
   if(!currentUser) return;
   try{

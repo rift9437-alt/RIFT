@@ -2189,6 +2189,48 @@ app.get('/api/feed', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Spending outside the shop
+// ---------------------------------------------------------------------------
+// Some things cost tokens without being a shop item — welding a wrecked part
+// back on mid-run, for instance. Same rule as earning: the client says what
+// it wants to do and how far into a run it is, and the price comes from here.
+// The scaling input is clamped, so an inflated round number buys nothing.
+const SPEND_REASONS = {
+  robot_repair: {
+    label: 'Weld a wrecked part back on',
+    // Rises with the round so late salvage is a real trade against drafting.
+    cost: n => 60 + Math.min(20, Math.max(1, n)) * 25
+  }
+};
+
+app.post('/api/wallet/spend', async (req, res) => {
+  const { user, reason, n } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  const spec = SPEND_REASONS[reason];
+  if (!spec) return res.status(400).json({ error: 'Unknown reason' });
+  const scale = Number.isFinite(Number(n)) ? Number(n) : 1;
+  const cost = spec.cost(scale);
+  flagIfSuspicious(user, 'wallet/spend');
+
+  try {
+    const result = await withWriteLock(async () => {
+      const data = await loadData();
+      const wallet = data[user].wallet;
+      if (wallet.tokens < cost) return { error: 'Not enough tokens', cost };
+      wallet.tokens -= cost;
+      await saveData(data);
+      return { wallet, cost };
+    });
+    if (result.error) return res.status(400).json(result);
+    res.json(result);
+  } catch (e) {
+    console.error('Spend failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Wallet + Shop endpoints
 // ---------------------------------------------------------------------------
 app.get('/api/wallet', async (req, res) => {
@@ -5000,6 +5042,8 @@ function mpPublic(room){
     locked: room.locked,
     count: room.players.size,
     max: MP_MODES[room.mode].max,
+    track: room.track || null,
+    trackName: room.track && KART_TRACKS[room.track] ? KART_TRACKS[room.track].name : null,
     players: [...room.players.values()].map(p => ({ user: p.user, ready: p.ready }))
   };
 }
@@ -5043,15 +5087,27 @@ function mpSendTo(user, type, payload){
 // would drop everyone into the infield, which is exactly what it did before
 // this existed.
 const KART_TRACK_R = 30;
-function kartTrackPoint(t){
+// Three circuits rather than one. The shape is a pair of sine terms over a
+// base radius, so a layout is three numbers — and because the server judges
+// checkpoints and places the grid against the same curve, the layout has to
+// live here and be told to the client rather than chosen by it.
+const KART_TRACKS = {
+  loop:    { name: 'Neon Loop',    r: 30, a: 6,   b: 3.5, blurb: 'The original — long straights, two real corners.' },
+  spiral:  { name: 'Coil',         r: 28, a: 9.5, b: 1.5, blurb: 'Tighter and twistier. Drifting matters more than top speed.' },
+  ribbon:  { name: 'Ribbon',       r: 33, a: 3,   b: 7,   blurb: 'Wide and fast, with a nasty triple kink on the back half.' }
+};
+const KART_DEFAULT_TRACK = 'loop';
+
+function kartTrackPoint(t, track){
+  const T = KART_TRACKS[track] || KART_TRACKS[KART_DEFAULT_TRACK];
   const a = t * Math.PI * 2;
-  const r = KART_TRACK_R + Math.sin(a * 2) * 6 + Math.sin(a * 3) * 3.5;
+  const r = T.r + Math.sin(a * 2) * T.a + Math.sin(a * 3) * T.b;
   return { x: Math.cos(a) * r, z: Math.sin(a) * r };
 }
 // Heading along the track at t, in the game's convention (x = sin(yaw),
 // z = cos(yaw)).
-function kartTrackYaw(t){
-  const a = kartTrackPoint(t), b = kartTrackPoint(t + 0.002);
+function kartTrackYaw(t, track){
+  const a = kartTrackPoint(t, track), b = kartTrackPoint(t + 0.002, track);
   return Math.atan2(b.x - a.x, b.z - a.z);
 }
 
@@ -5103,12 +5159,12 @@ function rollKartItem(place, total){
   return 'banana';
 }
 
-function kartBoxes(){
+function kartBoxes(track){
   const out = [];
   for(let s = 0; s < KART_BOX_STATIONS; s++){
     const t = (s + 0.5) / KART_BOX_STATIONS;
-    const p = kartTrackPoint(t);
-    const yaw = kartTrackYaw(t);
+    const p = kartTrackPoint(t, track);
+    const yaw = kartTrackYaw(t, track);
     const sx = Math.cos(yaw), sz = -Math.sin(yaw);
     KART_BOX_LANES.forEach(lane => {
       out.push({ x: p.x + sx * lane, z: p.z + sz * lane, takenAt: 0 });
@@ -5143,7 +5199,7 @@ function kartStrike(room, p, by){
 // landing, players driving into things — resolved once per relay tick.
 function kartTick(room, now){
   if(room.mode !== 'kart' || !room.started) return;
-  if(!room.boxes) room.boxes = kartBoxes();
+  if(!room.boxes) room.boxes = kartBoxes(room.track);
 
   for(const p of room.players.values()){
     if(p.finished) continue;
@@ -5199,8 +5255,8 @@ function mpSpawn(room, player, index){
     // the line and facing the way the circuit runs.
     const row = Math.floor(index / 2), col = index % 2;
     const t = -0.012 - row * 0.010;          // a little way back from t=0
-    const p = kartTrackPoint(t);
-    const yaw = kartTrackYaw(t);
+    const p = kartTrackPoint(t, room.track);
+    const yaw = kartTrackYaw(t, room.track);
     // Sideways along the road is the heading rotated a quarter turn.
     const sx = Math.cos(yaw), sz = -Math.sin(yaw);
     const lane = col === 0 ? -2.2 : 2.2;
@@ -5227,7 +5283,7 @@ setInterval(() => {
 }, 60000).unref();
 
 app.get('/api/mp/rooms', (req, res) => {
-  res.json({ rooms: mpRoomList(), modes: MP_MODES });
+  res.json({ rooms: mpRoomList(), modes: MP_MODES, tracks: KART_TRACKS });
 });
 
 app.post('/api/mp/create', async (req, res) => {
@@ -5244,7 +5300,8 @@ app.post('/api/mp/create', async (req, res) => {
     started: false,
     startedAt: 0,
     players: new Map(),
-    boxes: mode === 'kart' ? kartBoxes() : null,
+    track: mode === 'kart' ? (KART_TRACKS[req.body.track] ? req.body.track : KART_DEFAULT_TRACK) : null,
+    boxes: mode === 'kart' ? kartBoxes(KART_TRACKS[req.body.track] ? req.body.track : KART_DEFAULT_TRACK) : null,
     hazards: [],
     shells: [],
     touchedAt: Date.now()
@@ -5307,7 +5364,7 @@ app.post('/api/mp/start', async (req, res) => {
     if(room.host !== user) return res.status(403).json({ error: 'Only the host can start.' });
     room.started = true;
     room.startedAt = Date.now() + 3000;   // a shared countdown everyone sees
-    room.boxes = room.mode === 'kart' ? kartBoxes() : null;
+    room.boxes = room.mode === 'kart' ? kartBoxes(room.track) : null;
     room.hazards = [];
     room.shells = [];
     let i = 0;

@@ -58,7 +58,16 @@ const KartGame = (function(){
 
   // The circuit centreline. Checkpoints are evenly spaced around it, and the
   // road is drawn as quads between consecutive points.
-  const TRACK_R = 30;
+  // The layout is the server's — it judges checkpoints and places the grid
+  // against this exact curve, so a client drawing a different one would be
+  // racing a track nobody else can see. mpRoom.track says which.
+  const TRACKS = {
+    loop:   { r: 30, a: 6,   b: 3.5 },
+    spiral: { r: 28, a: 9.5, b: 1.5 },
+    ribbon: { r: 33, a: 3,   b: 7   }
+  };
+  let TRACK_R = 30, TRACK_A = 6, TRACK_B = 3.5;
+  let builtTrack = null;
   const NODES = 96;
   let centre = [];
   let trackFaces = [];
@@ -71,13 +80,29 @@ const KartGame = (function(){
   let drift = 0, driftDir = 0, boost = 0, boostPads = [];
   let lapTimes = [];
   let itemBoxes = [], myItem = null, spinUntil = 0, itemFlash = 0, canFire = false;
+  // Ghost: a translucent kart replaying your own best lap on this track. It's
+  // recorded as you drive and only replaces the stored one when you actually
+  // go quicker, so what you're chasing is always your personal best. Kept per
+  // track — a Coil lap is meaningless on the Ribbon.
+  const GHOST_KEY = 'level7_kart_ghost';
+  const GHOST_STEP = 3;            // record every third frame; plenty at 60fps
+  let ghostRec = [], ghostBest = null, ghostFrame = 0;
 
   // A closed loop with a couple of kinks, so it isn't a plain circle.
   function trackPoint(t){
     const a = t * Math.PI * 2;
-    const wobble = Math.sin(a * 2) * 6 + Math.sin(a * 3) * 3.5;
-    const r = TRACK_R + wobble;
+    const r = TRACK_R + Math.sin(a * 2) * TRACK_A + Math.sin(a * 3) * TRACK_B;
     return { x: Math.cos(a) * r, z: Math.sin(a) * r };
+  }
+
+  // Adopt whichever layout the room is racing, and rebuild if it changed.
+  function useTrack(id){
+    const T = TRACKS[id] || TRACKS.loop;
+    if(builtTrack === (id || 'loop') && centre.length) return;
+    TRACK_R = T.r; TRACK_A = T.a; TRACK_B = T.b;
+    builtTrack = id || 'loop';
+    buildTrack();
+    buildItemBoxes();
   }
 
   function buildTrack(){
@@ -181,6 +206,41 @@ const KartGame = (function(){
     }
   }
 
+  function loadGhost(){
+    ghostBest = null;
+    try{
+      const raw = localStorage.getItem(GHOST_KEY + ':' + (builtTrack || 'loop'));
+      if(raw){
+        const g = JSON.parse(raw);
+        if(g && Array.isArray(g.path) && g.path.length > 4) ghostBest = g;
+      }
+    }catch(e){ /* no storage — you just race without a ghost */ }
+  }
+
+  function saveGhost(ms, path){
+    if(!path || path.length < 4) return;
+    if(ghostBest && ghostBest.ms <= ms) return;
+    ghostBest = { ms, path };
+    try{
+      localStorage.setItem(GHOST_KEY + ':' + (builtTrack || 'loop'), JSON.stringify(ghostBest));
+    }catch(e){}
+  }
+
+  // Where the ghost was this far into its lap. Interpolated, because the
+  // recording is every third frame and a ghost that steps is worse than none.
+  function ghostAt(ms){
+    if(!ghostBest) return null;
+    const path = ghostBest.path;
+    const per = ghostBest.ms / (path.length - 1);
+    const f = Math.min(path.length - 1.001, Math.max(0, ms / per));
+    const i = Math.floor(f), frac = f - i;
+    const a = path[i], b = path[Math.min(path.length - 1, i + 1)];
+    let dy = b[2] - a[2];
+    while(dy > Math.PI) dy -= Math.PI*2;
+    while(dy < -Math.PI) dy += Math.PI*2;
+    return { x: a[0] + (b[0]-a[0])*frac, y: 0, z: a[1] + (b[1]-a[1])*frac, yaw: a[2] + dy*frac };
+  }
+
   function checkpointPos(i){
     return centre[Math.round((i / CHECKPOINTS) * NODES) % NODES];
   }
@@ -246,6 +306,8 @@ const KartGame = (function(){
     bestLap = 0; lastLapAt = 0;
     myItem = null; spinUntil = 0; itemFlash = 0; canFire = true;
     mpHazards = []; mpShells = []; mpBoxMask = 0;
+    loadGhost();
+    ghostRec = []; ghostFrame = 0;
     // Position comes from the server's grid — see needsSpawn in
     // multiplayer.js — so nothing here touches x/z/yaw.
     me.phase = 0; me.moving = false;
@@ -392,6 +454,11 @@ const KartGame = (function(){
     // a kart is going — the HUD, engine pitch — reads one number.
     me.speed = speed;
     me.boosting = boost > 0;
+    // Sample the line for the ghost. Rounded hard — this ends up in
+    // localStorage and centimetre precision buys nothing.
+    if(!locked && !finished && (ghostFrame++ % GHOST_STEP === 0)){
+      ghostRec.push([Math.round(me.x*10)/10, Math.round(me.z*10)/10, Math.round(me.yaw*100)/100]);
+    }
     me.moving = Math.abs(speed) > 0.02;
     me.phase = 0;
 
@@ -410,8 +477,10 @@ const KartGame = (function(){
             const lap = now - lastLapAt;
             lapTimes.push(lap);
             if(!bestLap || lap < bestLap) bestLap = lap;
+            saveGhost(lap, ghostRec);
           }
           lastLapAt = now;
+          ghostRec = []; ghostFrame = 0;
           if(myLap >= LAPS){
             finished = true;
             // Nothing left to use it on, and an item still showing in the
@@ -454,6 +523,15 @@ const KartGame = (function(){
     });
 
     let faces = trackFaces.concat(scenery, itemFaces());
+    // Your own best lap, running alongside. Faint and wireless-looking so it
+    // can never be mistaken for another player.
+    const gp = (ghostBest && lastLapAt) ? ghostAt(Date.now() - lastLapAt) : null;
+    if(gp){
+      const gk = [];
+      gk.push(...Mini3D.box(0, 0.26, 0.1, 1.15, 0.30, 1.85, '#7dd3ff', { alpha: 0.22 }));
+      gk.push(...Mini3D.box(0, 0.62, -0.2, 0.5, 0.7, 0.5, '#7dd3ff', { alpha: 0.22 }));
+      faces = faces.concat(Mini3D.transform(gk, { x: gp.x, y: 0, z: gp.z, yaw: gp.yaw }));
+    }
     const tags = [];
     mpOthers().forEach(({ user, p }) => {
       faces = faces.concat(kartFaces(user, p));
@@ -578,6 +656,22 @@ const KartGame = (function(){
       ctx.fillText('BOOST', 16, 78);
     }
     if(bestLap) ctx.fillText(`best ${(bestLap/1000).toFixed(1)}s`, 16, 62);
+    if(ghostBest){
+      // The time you're chasing, and whether you're up or down on it right
+      // now — a ghost you can't measure yourself against is just decoration.
+      const into = lastLapAt ? Date.now() - lastLapAt : 0;
+      const gp = ghostAt(into);
+      let delta = '';
+      if(gp && lastLapAt){
+        // drawHud has no local kart — the shared record is where "me" lives.
+        const me = mpLocal();
+        const ahead = ((me.x - gp.x) * Math.sin(gp.yaw) + (me.z - gp.z) * Math.cos(gp.yaw)) > 0;
+        delta = Math.hypot(me.x - gp.x, me.z - gp.z) < 1.5 ? ' · level'
+              : ahead ? ' · ahead' : ' · behind';
+      }
+      ctx.fillStyle = 'rgba(125,211,255,0.8)';
+      ctx.fillText(`ghost ${(ghostBest.ms/1000).toFixed(1)}s${delta}`, 16, 94);
+    }
 
     // running order, by laps then checkpoint progress
     const order = [...mpPlayers.entries()]
@@ -744,7 +838,7 @@ const KartGame = (function(){
 
   function start(){
     showScreen('kart-screen');
-    if(!centre.length){ buildTrack(); buildItemBoxes(); }
+    useTrack(typeof mpRoom !== 'undefined' && mpRoom ? mpRoom.track : 'loop');
     reset();
     raceStart = Date.now();
     paused = false; running = true;

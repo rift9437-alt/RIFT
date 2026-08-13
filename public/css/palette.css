@@ -425,3 +425,17 @@ body.big-hitboxes .wdi-btn { padding: 15px 14px; }
   color: var(--text-dim);
   padding: 14px 0;
 }
+
+/* ---- head to head ------------------------------------------------------ */
+.h2h-table td i {
+  display: block;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.h2h-table td { vertical-align: top; }
+.h2h-win { color: var(--cyan); font-weight: 700; }
+.h2h-tie { color: var(--text-dim); }

@@ -57,6 +57,10 @@ const WhoDidItGame = (function(){
   let rafId = null, running = false, paused = false;
   let timeLeft, frame, solved, message, messageTimer;
   let culprit, stolen, truth, clues, testimony, searched, questioned, accusing;
+  // Suspects you've ruled out yourself. Pure notebook — the game never reads
+  // it, it just stops you re-checking someone you already eliminated, which is
+  // exactly what people were doing on paper next to the keyboard.
+  let cleared = {};
 
   /* ---- case generation ------------------------------------------------ */
 
@@ -159,6 +163,7 @@ const WhoDidItGame = (function(){
 
     searched = {};
     questioned = {};
+    cleared = {};
     accusing = false;
     solved = null;
   }
@@ -289,8 +294,18 @@ const WhoDidItGame = (function(){
       if(!questioned[sp.id]) return;
       anyone = true;
       ctx.font = 'bold 10px "JetBrains Mono", monospace';
-      ctx.fillStyle = sp.colour;
+      ctx.fillStyle = cleared[sp.id] ? 'rgba(232,236,241,0.3)' : sp.colour;
       ctx.fillText(sp.name.toUpperCase(), RIGHT, y);
+      if(cleared[sp.id]){
+        // Struck through on the board as well as on the button, so the
+        // notebook and the case file agree at a glance.
+        const w = ctx.measureText(sp.name.toUpperCase()).width;
+        ctx.strokeStyle = 'rgba(232,236,241,0.45)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(RIGHT, y - 3); ctx.lineTo(RIGHT + w, y - 3);
+        ctx.stroke();
+      }
       y += SLH;
       ctx.font = '10px "JetBrains Mono", monospace';
       ctx.fillStyle = 'rgba(232,236,241,0.8)';
@@ -339,9 +354,9 @@ const WhoDidItGame = (function(){
         <div class="wdi-label">Who did it?</div>
         <div class="wdi-row">
           ${SUSPECTS.map(sp => `
-            <button class="wdi-btn wdi-accuse" style="--c:${sp.colour}"
+            <button class="wdi-btn wdi-accuse ${cleared[sp.id] ? 'crossed' : ''}" style="--c:${sp.colour}"
                     onclick="WhoDidItGame.accuse('${sp.id}')">
-              ${sp.icon} ${sp.name}
+              ${sp.icon} ${sp.name}${cleared[sp.id] ? ' · ruled out' : ''}
             </button>`).join('')}
         </div>
         <button class="btn btn-ghost" onclick="WhoDidItGame.cancelAccuse()">Not yet</button>`;
@@ -359,9 +374,12 @@ const WhoDidItGame = (function(){
       <div class="wdi-label">Question a suspect &middot; ${TALK_COST}s each</div>
       <div class="wdi-row">
         ${SUSPECTS.map(sp => `
-          <button class="wdi-btn ${questioned[sp.id] ? 'done' : ''}" style="--c:${sp.colour}"
+          <button class="wdi-btn ${questioned[sp.id] ? 'done' : ''} ${cleared[sp.id] ? 'crossed' : ''}"
+                  style="--c:${sp.colour}"
                   onclick="WhoDidItGame.question('${sp.id}')">
             ${sp.icon} ${sp.name}
+            <b class="wdi-cross" title="Rule them out"
+               onclick="event.stopPropagation(); WhoDidItGame.toggleCleared('${sp.id}')">✗</b>
           </button>`).join('')}
       </div>
       <button class="btn btn-primary" onclick="WhoDidItGame.beginAccuse()">Name the culprit</button>`;
@@ -424,6 +442,14 @@ const WhoDidItGame = (function(){
     };
   }
 
+  function toggleCleared(id){
+    if(!running || solved) return;
+    cleared[id] = !cleared[id];
+    Sfx.play('click', cleared[id] ? 0.8 : 1.3);
+    render();
+  }
+
   return { start, stop, reset, onKeyPress, pause, resume, isPaused, isRunning,
-           searchRoom, question, beginAccuse, cancelAccuse, accuse, caseNotes };
+           searchRoom, question, beginAccuse, cancelAccuse, accuse, caseNotes,
+           toggleCleared };
 })();

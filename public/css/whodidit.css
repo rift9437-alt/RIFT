@@ -73,3 +73,27 @@
 @media (max-width: 640px) {
   .wdi-btn { min-width: 100%; }
 }
+
+/* ---- notebook: ruling a suspect out ------------------------------------ */
+/* A cross you can strike through a name yourself. The game doesn't read it —
+   it's the pad of paper people were keeping next to the keyboard. */
+.wdi-cross {
+  float: right;
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.25;
+  padding: 0 3px;
+  border-radius: 3px;
+  transition: opacity .12s, color .12s;
+}
+.wdi-cross:hover { opacity: 1; color: var(--pink); }
+.wdi-btn.crossed {
+  opacity: 0.4;
+  text-decoration: line-through;
+  text-decoration-color: var(--pink);
+}
+.wdi-btn.crossed .wdi-cross {
+  opacity: 1;
+  color: var(--pink);
+  text-decoration: none;
+}

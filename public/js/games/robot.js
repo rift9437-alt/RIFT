@@ -501,7 +501,69 @@ const RobotGame = (function(){
     return bits.join('');
   }
 
+  // What a weld costs. Priced off the round only, because that's the one
+  // input the server can check — a rarity multiplier would mean trusting the
+  // client about how valuable its own part is. Mirrors SPEND_REASONS in
+  // server.js; the server is what actually charges you.
+  function repairCost(){
+    return 60 + Math.min(20, Math.max(1, round)) * 25;
+  }
+
+  // Between rounds you can weld one wrecked part back on instead of taking a
+  // card. A destroyed thruster used to be gone for good, which meant one bad
+  // exchange quietly ended the run three rounds later; this gives that a
+  // price rather than a full stop.
+  function renderSalvage(){
+    const box = document.getElementById('robot-salvage');
+    if(!box) return;
+    const wrecked = me.parts.filter(p => p.broken);
+    if(!wrecked.length){ box.innerHTML = ''; box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    box.innerHTML = `
+      <div class="salvage-head">SALVAGE BAY &middot; weld one back on instead of drafting</div>
+      <div class="salvage-row">
+        ${wrecked.map((p) => {
+          const i = me.parts.indexOf(p);
+          const cost = repairCost();
+          const afford = (wallet && wallet.tokens || 0) >= cost;
+          return `
+            <button class="salvage-part rar-${p.rarity} ${afford ? '' : 'poor'}"
+                    ${afford ? '' : 'disabled'} onclick="RobotGame.repairPart(${i})">
+              <span class="salvage-icon">${p.icon}</span>
+              <span class="salvage-name">${p.name}</span>
+              <span class="salvage-cost">🪙 ${cost}</span>
+            </button>`;
+        }).join('')}
+      </div>`;
+  }
+
+  function repairPart(i){
+    const p = me.parts[i];
+    if(!p || !p.broken || !drafting) return;
+    const cost = repairCost();
+    if((wallet && wallet.tokens || 0) < cost){
+      if(typeof toast === 'function') toast('Not enough tokens', `That weld costs ${cost}`, '🔧', 'pink');
+      return;
+    }
+    // Spending goes through the server the same way any purchase does; the
+    // part only comes back once the tokens have actually gone.
+    if(typeof spendTokens === 'function'){
+      spendTokens('robot_repair', round).then(ok => {
+        if(!ok) return;
+        p.broken = false;
+        me.s = statsOf(me.parts);
+        me.maxHp = me.s.maxHp;
+        me.hp = Math.min(me.maxHp, me.hp + p.maxHp * 0.5);
+        Sfx.play('perfect');
+        if(typeof toast === 'function') toast('Welded back on', p.name, '🔧', 'cyan');
+        renderSalvage();
+        updateHud();
+      });
+    }
+  }
+
   function renderDraft(){
+    renderSalvage();
     const box = document.getElementById('robot-draft-cards');
     box.innerHTML = draftCards.map((p, i) => {
       const rar = RARITIES[p.rarity];
@@ -537,6 +599,8 @@ const RobotGame = (function(){
     me.hp = Math.min(me.maxHp, me.hp + p.maxHp);
     drafting = false;
     document.getElementById('robot-draft').classList.add('hidden');
+    const bay = document.getElementById('robot-salvage');
+    if(bay) bay.classList.add('hidden');
     Sfx.play('win');
     freshFight();
   }
@@ -768,5 +832,6 @@ const RobotGame = (function(){
   function isPaused(){ return paused; }
   function isRunning(){ return running; }
 
-  return { start, stop, reset, onKeyPress, pause, resume, isPaused, isRunning, takePart };
+  return { start, stop, reset, onKeyPress, pause, resume, isPaused, isRunning,
+           takePart, repairPart };
 })();

@@ -31,6 +31,18 @@ const HubWorld = (function(){
   // season the server reports, so it switches off on its own when the season
   // ends rather than needing a code change.
   let ghosts = [];
+  // Trick-or-treat doors. Knocking is walking into one; each answers once per
+  // visit, so the plaza doesn't become a token farm you stand in.
+  const DOORS = [
+    { x: -16, z: -6 }, { x: 16, z: -6 }, { x: -16, z: 8 }, { x: 16, z: 8 }
+  ];
+  const TREATS = [
+    { icon:'🍬', text:'A handful of tokens.',        pumpkins: 3 },
+    { icon:'🍫', text:'Something better.',           pumpkins: 6 },
+    { icon:'🍭', text:'They were expecting you.',    pumpkins: 4 },
+    { icon:'👻', text:'Trick. Something came out.',  trick: true }
+  ];
+  let doorsUsed = [];
   let banished = 0;
   let spookyPending = { pumpkin: 0, ghost: 0 };
   let ended13 = false;   // one trip through the gate per visit
@@ -97,6 +109,21 @@ const HubWorld = (function(){
         out.push(...Mini3D.box(gx, 0.7, gz, 1.1, 1.4, 0.28, '#5b6470', edge));
         out.push(...Mini3D.box(gx, 1.5, gz, 1.1, 0.5, 0.28, '#5b6470', edge));
       }
+      // Four doors round the plaza to knock on. Trick or treat: most give
+      // you something, one in four slams and costs you a couple of seconds
+      // of being chased by whatever answered.
+      DOORS.forEach((d, i) => {
+        const knocked = doorsUsed[i];
+        out.push(...Mini3D.box(d.x, 1.9, d.z, 2.6, 3.8, 0.4,
+                               knocked ? '#241a12' : '#4a3220', edge));
+        out.push(...Mini3D.box(d.x, 1.9, d.z - 0.24, 2.0, 3.2, 0.06,
+                               knocked ? '#120c08' : '#6b4a2c', edge));
+        if(!knocked){
+          out.push(...Mini3D.box(d.x + 0.7, 1.8, d.z - 0.3, 0.18, 0.18, 0.18, '#ffc857',
+                                 { glow: '#ffc857', glowBlur: 14 }));
+        }
+      });
+
       // a crooked gate where the thirteenth cabinet would be
       out.push(...Mini3D.box(0, 2.6, -20, 0.5, 5.2, 0.5, '#2a1d12', edge));
       out.push(...Mini3D.box(5, 2.6, -20, 0.5, 5.2, 0.5, '#2a1d12', edge));
@@ -149,6 +176,7 @@ const HubWorld = (function(){
     me.phase = 0; me.moving = false;
     camYaw = me.yaw;
     frame = 0;
+    doorsUsed = [];
   }
 
   function update(){
@@ -235,6 +263,34 @@ const HubWorld = (function(){
     // Progress is batched rather than one request per pickup — a plaza full
     // of pumpkins would otherwise be a request storm.
     if(frame % 120 === 0) flushSpooky();
+
+    // Knocking on a door — walk into it. Each answers once a visit.
+    if(haunted()){
+      for(let i=0;i<DOORS.length;i++){
+        if(doorsUsed[i]) continue;
+        if(Math.hypot(me.x - DOORS[i].x, me.z - DOORS[i].z) > 2.4) continue;
+        doorsUsed[i] = true;
+        const treat = TREATS[Math.floor(Math.random() * TREATS.length)];
+        if(treat.trick){
+          // A ghost is let out right where you're standing, which is a real
+          // cost — you now have to shake it or banish it.
+          ghosts.push({ x: DOORS[i].x, z: DOORS[i].z, yaw: 0,
+                        bob: Math.random()*Math.PI*2, gone: 0 });
+          Sfx.play('alarm');
+        } else {
+          spookyPending.pumpkin += treat.pumpkins;
+          Sfx.play('coin', 1.3);
+        }
+        if(typeof toast === 'function'){
+          toast(treat.trick ? 'Trick' : 'Treat', treat.text, treat.icon,
+                treat.trick ? 'pink' : 'gold');
+        }
+        // The doors are part of the scenery, so a knocked one has to be
+        // rebuilt into the geometry to look answered.
+        props = buildProps();
+        break;
+      }
+    }
 
     // The crooked gate. Walking into it is the only way to cabinet thirteen —
     // it's on no card and in no list.

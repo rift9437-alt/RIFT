@@ -60,9 +60,14 @@ function renderMpLobby(){
       <div class="setup-section-label">Start a room</div>
       <div class="mp-create-row">
         <input id="mp-name" maxlength="28" class="clan-input" placeholder="Room name">
-        <select id="mp-mode" class="clan-input">
+        <select id="mp-mode" class="clan-input" onchange="syncTrackPicker()">
           <option value="world">🌍 The Hub — hang out</option>
           <option value="kart">🏎 Rift Kart — race with items</option>
+        </select>
+        <select id="mp-track" class="clan-input" title="Which circuit (Rift Kart only)">
+          <option value="loop">🛣 Neon Loop — long straights</option>
+          <option value="spiral">🌀 Coil — tight and twisty</option>
+          <option value="ribbon">🎗 Ribbon — wide, fast, nasty kinks</option>
         </select>
       </div>
       <label class="mp-check">
@@ -86,7 +91,7 @@ function renderMpLobby(){
         <div class="mp-card-head">
           <span class="mp-code">${r.code}</span>
           <span class="mp-name">${escapeHtml(r.name)}</span>
-          <span class="mp-mode">${mpModeLabel(r.mode)}</span>
+          <span class="mp-mode">${mpModeLabel(r.mode)}${r.trackName ? ' · ' + escapeHtml(r.trackName) : ''}</span>
           <span class="mp-count">${r.count}/${r.max}</span>
           ${r.started ? '<span class="mp-live">● in progress</span>' : ''}
           <button class="btn btn-primary btn-small"
@@ -97,6 +102,14 @@ function renderMpLobby(){
         </div>
       </div>`).join('')
     : '<div class="clan-empty">No open rooms. Make one — your friends can join with the code.</div>'}`;
+  syncTrackPicker();
+}
+
+// The circuit only means anything for a race, so it hides for the hub.
+function syncTrackPicker(){
+  const mode = document.getElementById('mp-mode');
+  const track = document.getElementById('mp-track');
+  if(mode && track) track.classList.toggle('hidden', mode.value !== 'kart');
 }
 
 function renderMpRoom(){
@@ -109,7 +122,7 @@ function renderMpRoom(){
       <div class="mp-room-head">
         <div>
           <div class="mp-room-name">${escapeHtml(mpRoom.name)}</div>
-          <div class="mp-room-sub">${mpModeLabel(mpRoom.mode)} · host ${mpRoom.host}</div>
+          <div class="mp-room-sub">${mpModeLabel(mpRoom.mode)}${mpRoom.trackName ? ' · ' + escapeHtml(mpRoom.trackName) : ''} · host ${mpRoom.host}</div>
         </div>
         <div class="mp-room-code">
           <span>SHARE THIS CODE</span>
@@ -188,6 +201,7 @@ async function mpPost(path, body, failMsg){
 async function createMpRoom(){
   const data = await mpPost('create', {
     mode: document.getElementById('mp-mode').value,
+    track: document.getElementById('mp-track').value,
     name: document.getElementById('mp-name').value.trim(),
     locked: document.getElementById('mp-private').checked
   }, 'Could not create that room.');

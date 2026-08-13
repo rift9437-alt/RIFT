@@ -89,3 +89,42 @@
 @media (max-width: 620px) {
   #robot-draft-cards { grid-template-columns: 1fr; }
 }
+
+/* ---- salvage bay ------------------------------------------------------- */
+/* Shown above the draft when you finished a round with parts wrecked: weld
+   one back on instead of taking a card. Losing a thruster for good used to
+   quietly end a run three rounds later. */
+#robot-salvage { margin-bottom: 14px; }
+.salvage-head {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  text-align: center;
+  margin-bottom: 8px;
+}
+.salvage-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.salvage-part {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--rar, var(--border));
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: border-color .12s, transform .12s;
+}
+.salvage-part:hover { transform: translateY(-1px); border-color: var(--cyan); }
+.salvage-part.poor { opacity: 0.4; cursor: not-allowed; }
+.salvage-icon { font-size: 14px; }
+.salvage-cost { color: var(--gold); }
