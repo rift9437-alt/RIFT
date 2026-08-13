@@ -206,3 +206,112 @@ body.big-hitboxes .wdi-btn { padding: 15px 14px; }
   .palette-input { font-size: 14px; padding: 14px 15px; }
   .ks-row { flex-wrap: wrap; }
 }
+
+/* =========================================================
+   PROGRESSION — achievement bars, reroll, weekly, season track
+   ========================================================= */
+
+/* ---- achievement progress --------------------------------------------- */
+.ach-progress { margin: 8px 0 4px; }
+.ach-progress-track {
+  height: 5px;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ach-progress-track i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--gold));
+  border-radius: 3px;
+}
+.ach-progress-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* ---- daily reroll ------------------------------------------------------ */
+/* Top-right of the card, out of the way of the label but obviously part of
+   the card it belongs to. */
+.daily-card { position: relative; }
+.daily-reroll {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 6px;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity .15s, border-color .15s, transform .15s;
+}
+.daily-reroll:hover {
+  opacity: 1;
+  border-color: var(--gold);
+  transform: rotate(-20deg);
+}
+
+/* ---- season track ------------------------------------------------------ */
+.pass-bar {
+  height: 7px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 12px 0 14px;
+}
+.pass-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--pink), var(--gold));
+}
+
+/* Scrolls sideways rather than wrapping: the track is a track, and ten tiers
+   wrapped onto three rows stops reading as progress. */
+.pass-tiers {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.pass-tier {
+  flex: 0 0 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 8px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  cursor: default;
+}
+.pass-tier-n {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.pass-tier-reward { font-size: 10.5px; text-align: center; line-height: 1.4; }
+.pass-tier-state {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+.pass-tier.locked { opacity: 0.45; }
+.pass-tier.ready {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold) inset;
+  cursor: pointer;
+}
+.pass-tier.ready .pass-tier-state { color: var(--gold); }
+.pass-tier.ready:hover { background: color-mix(in srgb, var(--gold) 14%, var(--bg-panel-raised)); }
+.pass-tier.claimed .pass-tier-n,
+.pass-tier.claimed .pass-tier-state { color: var(--cyan); }

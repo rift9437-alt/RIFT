@@ -418,6 +418,11 @@ const LOSS_REASONS = ['soccer_loss', 'racing_loss', 'tank_loss', 'wildduel_loss'
 // any newly-earned ones, and applies their rewards. Mutates `data[user]` —
 // caller is responsible for saving. Returns the list of achievement ids that
 // were newly unlocked this call (so the client can show an "unlocked!" toast).
+// checkAchievements also fills this in as a side effect; the achievements
+// endpoint calls it and then reads the numbers out, so the progress bars and
+// the unlock gate can never disagree about how far along something is.
+let lastAchievementMetrics = {};
+
 function checkAchievements(data, user) {
   const wallet = data[user].wallet;
   if (!Array.isArray(wallet.achievements)) wallet.achievements = [];
@@ -428,45 +433,66 @@ function checkAchievements(data, user) {
   const has = (id) => wallet.achievements.includes(id);
   const totalWins = Object.keys(DEFAULT_STATS).reduce((sum, g) => sum + (data[user][g] && typeof data[user][g].wins === 'number' ? data[user][g].wins : 0), 0);
 
-  const progress = {
-    first_victory:  totalWins >= 1,
-    goals_100:      (data[user].soccer?.goals || 0) >= 100,
-    floor_50:       (data[user].roguelike?.deepestFloor || 0) >= 50,
-    tokens_10000:   wallet.stats.tokensEarnedLifetime >= 10000,
-    win_streak_20:  wallet.stats.bestWinStreak >= 20,
-    bricks_5000:    wallet.stats.bricksBroken >= 5000,
-    races_100:      wallet.stats.racesFinished >= 100,
+  // How far along each one is, as a pair rather than a yes/no. The gate below
+  // still only cares whether have >= need, but the client can draw a bar with
+  // it — "0 of 500 races" is a very different thing to look at than a padlock.
+  const metrics = {};
+  const track = (id, have, need) => {
+    metrics[id] = { have: Math.max(0, Math.round(have)), need };
+    return have >= need;
+  };
+  // Things that are simply true or false get a 0/1 bar, which reads as
+  // "not yet" rather than as a half-finished one.
+  const flag = (id, done) => track(id, done ? 1 : 0, 1);
 
-    wins_100:       totalWins >= 100,
-    floor_100:      (data[user].roguelike?.deepestFloor || 0) >= 100,
-    win_streak_50:  wallet.stats.bestWinStreak >= 50,
-    tokens_50000:   wallet.stats.tokensEarnedLifetime >= 50000,
-    bricks_20000:   wallet.stats.bricksBroken >= 20000,
-    races_500:      wallet.stats.racesFinished >= 500,
-    sleuth_25:      (data[user].whodidit?.solved || 0) >= 25,
+  const progress = {
+    first_victory:  track('first_victory', totalWins, 1),
+    goals_100:      track('goals_100', data[user].soccer?.goals || 0, 100),
+    floor_50:       track('floor_50', data[user].roguelike?.deepestFloor || 0, 50),
+    tokens_10000:   track('tokens_10000', wallet.stats.tokensEarnedLifetime, 10000),
+    win_streak_20:  track('win_streak_20', wallet.stats.bestWinStreak, 20),
+    bricks_5000:    track('bricks_5000', wallet.stats.bricksBroken, 5000),
+    races_100:      track('races_100', wallet.stats.racesFinished, 100),
+
+    wins_100:       track('wins_100', totalWins, 100),
+    floor_100:      track('floor_100', data[user].roguelike?.deepestFloor || 0, 100),
+    win_streak_50:  track('win_streak_50', wallet.stats.bestWinStreak, 50),
+    tokens_50000:   track('tokens_50000', wallet.stats.tokensEarnedLifetime, 50000),
+    bricks_20000:   track('bricks_20000', wallet.stats.bricksBroken, 20000),
+    races_500:      track('races_500', wallet.stats.racesFinished, 500),
+    sleuth_25:      track('sleuth_25', data[user].whodidit?.solved || 0, 25),
     // Collector counts only permanent, non-limited themes — a seasonal
     // theme rotating out shouldn't make this achievement unobtainable.
-    collector:      Object.keys(SHOP_ITEMS)
-                       .filter(id => SHOP_ITEMS[id].type !== 'upgrade' && !SHOP_ITEMS[id].limited)
-                       .every(id => wallet.owned.includes(id)),
+    collector:      (() => {
+                      const all = Object.keys(SHOP_ITEMS)
+                        .filter(id => SHOP_ITEMS[id].type !== 'upgrade' && !SHOP_ITEMS[id].limited);
+                      return track('collector', all.filter(id => wallet.owned.includes(id)).length, all.length);
+                    })(),
 
-    full_roster:    ['zip', 'duo', 'uro', 'trio', 'zipmerge', 'duomerge', 'uromerge', 'triomerge']
-                       .every(id => wallet.owned.includes(id)),
-    big_spender:    (wallet.stats.maxTokensHeld || 0) >= 5000 && wallet.tokens === 0,
-    crate_collector:(wallet.stats.crateOpens || 0) >= 25,
-    jackpot:        (wallet.stats.legendaryCratePulls || 0) >= 1
+    full_roster:    (() => {
+                      const roster = ['zip', 'duo', 'uro', 'trio', 'zipmerge', 'duomerge', 'uromerge', 'triomerge'];
+                      return track('full_roster', roster.filter(id => wallet.owned.includes(id)).length, roster.length);
+                    })(),
+    big_spender:    flag('big_spender', (wallet.stats.maxTokensHeld || 0) >= 5000 && wallet.tokens === 0),
+    crate_collector:track('crate_collector', wallet.stats.crateOpens || 0, 25),
+    jackpot:        track('jackpot', wallet.stats.legendaryCratePulls || 0, 1)
   };
   // Legendary unlocks once every OTHER achievement is unlocked.
-  progress.legendary = Object.keys(ACHIEVEMENTS).filter(id => id !== 'legendary').every(id => progress[id] || has(id));
+  const others = Object.keys(ACHIEVEMENTS).filter(id => id !== 'legendary');
+  progress.legendary = track('legendary', others.filter(id => progress[id] || has(id)).length, others.length);
 
   // Season 2 counters live on the wallet under `spooky`, so they survive the
   // season and can still be shown on a profile afterwards.
   const spooky = wallet.spooky || {};
-  progress.pumpkin_picker = (spooky.pumpkins || 0) >= 10;
-  progress.pumpkin_hoard  = (spooky.pumpkins || 0) >= 100;
-  progress.ghost_hunter   = (spooky.ghosts || 0) >= 25;
-  progress.midnight_shift = !!spooky.midnight;
-  progress.the_thirteenth = !!spooky.thirteenth;
+  progress.pumpkin_picker = track('pumpkin_picker', spooky.pumpkins || 0, 10);
+  progress.pumpkin_hoard  = track('pumpkin_hoard', spooky.pumpkins || 0, 100);
+  progress.ghost_hunter   = track('ghost_hunter', spooky.ghosts || 0, 25);
+  progress.midnight_shift = flag('midnight_shift', !!spooky.midnight);
+  progress.the_thirteenth = flag('the_thirteenth', !!spooky.thirteenth);
+
+  // Stashed so the achievements endpoint can report it without recomputing
+  // the whole set from a second copy of these rules.
+  lastAchievementMetrics = metrics;
 
   const newlyUnlocked = [];
   for (const id of Object.keys(ACHIEVEMENTS)) {
@@ -668,6 +694,98 @@ const CHALLENGE_POOL = [
 ];
 const DAILY_STREAK_BONUS_PER_DAY = 50;
 const DAILY_STREAK_BONUS_CAP = 500;
+// One swap a day, for the challenge you were never going to do. Priced so
+// it's a real decision rather than a formality.
+const DAILY_REROLL_COST = 250;
+
+// ---------------------------------------------------------------------------
+// Weekly Quests
+// ---------------------------------------------------------------------------
+// Bigger than a daily and they run Monday to Monday, so they reward coming
+// back across the week rather than grinding one sitting. Progress rides on
+// the same reason plumbing the dailies use — a thing that happened advances
+// whatever is watching for it, daily or weekly.
+const WEEKLY_POOL = [
+  { id: 'w_wins15',   icon: '🏆', label: 'Win 15 games across the arcade',
+    reasons: ['soccer_win','racing_win','tank_win','wildduel_win','sumo_win','tag_win','samurai_win','tactics_win','runeduel_win','warlord_win','robot_win','kart_win'],
+    target: 15, tokens: 900 },
+  { id: 'w_bricks600',icon: '🧱', label: 'Break 600 bricks', reasons: ['breaker_brick'], target: 600, tokens: 700 },
+  { id: 'w_floors25', icon: '💀', label: 'Clear 25 dungeon floors', reasons: ['roguelike_floor'], target: 25, tokens: 800 },
+  { id: 'w_races20',  icon: '🏎', label: 'Finish 20 races', reasons: ['racing_win','racing_loss','kart_win','kart_finish'], target: 20, tokens: 750 },
+  { id: 'w_goals40',  icon: '⚽', label: 'Score 40 goals', reasons: ['soccer_goal'], target: 40, tokens: 700 },
+  { id: 'w_crates5',  icon: '📦', label: 'Open 5 Loot Crates', reasons: ['lootcrate_open'], target: 5, tokens: 650 },
+  { id: 'w_waves30',  icon: '🧟', label: 'Survive 30 zombie waves', reasons: ['zombie_wave'], target: 30, tokens: 800 },
+  { id: 'w_solve5',   icon: '🔍', label: 'Close 5 cases in Who Did It?', reasons: ['mystery_solved'], target: 5, tokens: 850 }
+];
+// Clearing all three in a week pays a chest on top.
+const WEEKLY_CLEAR_BONUS = 2500;
+
+// Weeks are bucketed by the same weekKey() the shop rotation already uses —
+// defining a second one here shadowed it for the whole file, which is how
+// this rolled over on a different day to everything else in the app.
+function ensureWeeklyQuests(wallet) {
+  const week = weekKey();
+  if (!wallet.weekly || wallet.weekly.week !== week) {
+    const picked = seededPick('w' + week, WEEKLY_POOL, 3);
+    wallet.weekly = {
+      week,
+      bonusClaimed: false,
+      quests: picked.map(q => ({ id: q.id, icon: q.icon, label: q.label, reasons: q.reasons,
+                                 target: q.target, tokens: q.tokens, progress: 0, claimed: false }))
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Season Pass
+// ---------------------------------------------------------------------------
+// A track of tiers you climb by playing anything at all: season XP mirrors
+// the tokens you earn, the same way account XP already does. Rewards are
+// claimed one tier at a time rather than granted automatically, so coming
+// back to a row of unclaimed tiers is part of the appeal.
+const PASS_TIER_XP = 1500;
+const PASS_TIERS = [
+  { tier: 1,  reward: { tokens: 400 } },
+  { tier: 2,  reward: { tokens: 600 } },
+  { tier: 3,  reward: { title: 'Trick or Treat' } },
+  { tier: 4,  reward: { tokens: 900 } },
+  { tier: 5,  reward: { crate: 1 } },
+  { tier: 6,  reward: { tokens: 1200 } },
+  { tier: 7,  reward: { border: 'season2-border' } },
+  { tier: 8,  reward: { tokens: 1600 } },
+  { tier: 9,  reward: { crate: 2 } },
+  { tier: 10, reward: { tokens: 2200, title: 'Season Two' } }
+];
+const PASS_MAX_TIER = PASS_TIERS.length;
+
+// A pass belongs to one season. Rolling over to a new season starts an empty
+// track rather than carrying the old one's progress across.
+function ensureSeasonPass(wallet) {
+  if (!wallet.pass || wallet.pass.season !== CURRENT_SEASON) {
+    wallet.pass = { season: CURRENT_SEASON, xp: 0, claimed: [] };
+  }
+  if (!Array.isArray(wallet.pass.claimed)) wallet.pass.claimed = [];
+  return wallet.pass;
+}
+
+function passTierOf(xp) {
+  return Math.max(0, Math.min(PASS_MAX_TIER, Math.floor(xp / PASS_TIER_XP)));
+}
+
+function passSummary(wallet) {
+  const pass = ensureSeasonPass(wallet);
+  const tier = passTierOf(pass.xp);
+  return {
+    season: CURRENT_SEASON,
+    xp: pass.xp,
+    tier,
+    maxTier: PASS_MAX_TIER,
+    tierXp: PASS_TIER_XP,
+    intoTier: tier >= PASS_MAX_TIER ? PASS_TIER_XP : pass.xp % PASS_TIER_XP,
+    claimed: pass.claimed.slice(),
+    tiers: PASS_TIERS
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Daily Spin Wheel
@@ -739,15 +857,18 @@ function ensureDailyChallenges(wallet) {
   }
 }
 
-// Advances progress on any of today's challenges that match this reason.
-// Caller (wallet/earn or lootcrate/open) is responsible for saving.
+// Advances anything watching for this reason — today's challenges and this
+// week's quests both. Caller (wallet/earn or lootcrate/open) saves.
 function updateDailyChallenges(wallet, reason, qty) {
   ensureDailyChallenges(wallet);
-  wallet.daily.challenges.forEach(c => {
+  ensureWeeklyQuests(wallet);
+  const bump = c => {
     if (!c.claimed && c.reasons.includes(reason)) {
       c.progress = Math.min(c.target, c.progress + qty);
     }
-  });
+  };
+  wallet.daily.challenges.forEach(bump);
+  wallet.weekly.quests.forEach(bump);
 }
 
 // ---------------------------------------------------------------------------
@@ -2552,9 +2673,14 @@ app.get('/api/shop/items', (req, res) => {
 app.get('/api/achievements', async (req, res) => {
   const { user } = req.query || {};
   let unlocked = [];
+  let progress = {};
   if (user && USERS.includes(user)) {
     const data = await loadData();
     unlocked = data[user].wallet.achievements || [];
+    // Run the real rules and read the numbers back out, so a bar can never
+    // say 99% on something the gate already considers finished.
+    checkAchievements(data, user);
+    progress = lastAchievementMetrics;
   }
   const masked = {};
   for (const [id, a] of Object.entries(ACHIEVEMENTS)) {
@@ -2563,6 +2689,9 @@ app.get('/api/achievements', async (req, res) => {
     } else {
       masked[id] = a;
     }
+    // A secret's progress would give away what it wants, so it's withheld
+    // until the thing is unlocked.
+    if (progress[id] && !(a.secret && !unlocked.includes(id))) masked[id].progress = progress[id];
   }
   res.json(masked);
 });
@@ -2597,6 +2726,7 @@ app.post('/api/wallet/earn', async (req, res) => {
       if (amount > 0) {
         wallet.stats.tokensEarnedLifetime += amount;
         wallet.xp = (wallet.xp || 0) + amount; // XP mirrors tokens earned 1-for-1.
+        ensureSeasonPass(wallet).xp += amount; // and so does the season track
       }
       wallet.stats.maxTokensHeld = Math.max(wallet.stats.maxTokensHeld || 0, wallet.tokens);
       if (reason === 'breaker_brick') wallet.stats.bricksBroken += safeQty;
@@ -2998,11 +3128,18 @@ app.get('/api/daily/challenges', async (req, res) => {
       const data = await loadData();
       const wallet = data[user].wallet;
       ensureDailyChallenges(wallet);
+      ensureWeeklyQuests(wallet);
+      ensureSeasonPass(wallet);
       await saveData(data);
       return wallet;
     });
     res.json({
       daily: result.daily,
+      weekly: result.weekly,
+      weeklyClearBonus: WEEKLY_CLEAR_BONUS,
+      pass: passSummary(result),
+      rerollCost: DAILY_REROLL_COST,
+      rerollUsed: !!(result.daily && result.daily.rerolled),
       streak: result.dailyStreak || 0,
       bestStreak: result.dailyBestStreak || 0,
       streakBonusPerDay: DAILY_STREAK_BONUS_PER_DAY,
@@ -3035,6 +3172,7 @@ app.post('/api/daily/claim', async (req, res) => {
       challenge.claimed = true;
       wallet.tokens += challenge.tokens;
       wallet.xp = (wallet.xp || 0) + challenge.tokens;
+      ensureSeasonPass(wallet).xp += challenge.tokens;
 
       let streakBonus = 0;
       const allClaimed = wallet.daily.challenges.every(c => c.claimed);
@@ -3052,6 +3190,7 @@ app.post('/api/daily/claim', async (req, res) => {
         streakBonus = Math.min(DAILY_STREAK_BONUS_CAP, wallet.dailyStreak * DAILY_STREAK_BONUS_PER_DAY);
         wallet.tokens += streakBonus;
         wallet.xp += streakBonus;
+        wallet.pass.xp += streakBonus;
       }
 
       checkLevelUp(data, user);
@@ -3066,6 +3205,156 @@ app.post('/api/daily/claim', async (req, res) => {
     res.status(500).json({ error: 'Internal error' });
   }
 });
+
+// Swap out one of today's challenges for a different one. Once a day, paid
+// for, and never on something already finished — otherwise it would be a way
+// to farm the pool rather than a way out of a challenge you can't face.
+app.post('/api/daily/reroll', async (req, res) => {
+  const { user, challengeId } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  flagIfSuspicious(user, 'daily/reroll');
+
+  try {
+    const result = await withWriteLock(async () => {
+      const data = await loadData();
+      const wallet = data[user].wallet;
+      ensureDailyChallenges(wallet);
+      if (wallet.daily.rerolled) return { error: 'You have already rerolled today.' };
+      const idx = wallet.daily.challenges.findIndex(c => c.id === challengeId);
+      if (idx < 0) return { error: 'Unknown challenge' };
+      const old = wallet.daily.challenges[idx];
+      if (old.claimed) return { error: 'That one is already claimed.' };
+      if (old.progress >= old.target) return { error: "That one's already done — claim it instead." };
+      if (wallet.tokens < DAILY_REROLL_COST) return { error: `Rerolling costs ${DAILY_REROLL_COST} tokens.` };
+
+      const taken = new Set(wallet.daily.challenges.map(c => c.id));
+      const options = CHALLENGE_POOL.filter(c => !taken.has(c.id));
+      if (!options.length) return { error: 'Nothing else to swap to today.' };
+      const pick = options[Math.floor(Math.random() * options.length)];
+
+      wallet.tokens -= DAILY_REROLL_COST;
+      wallet.daily.rerolled = true;
+      wallet.daily.challenges[idx] = {
+        id: pick.id, icon: pick.icon, label: pick.label, reasons: pick.reasons,
+        target: pick.target, tokens: pick.tokens, progress: 0, claimed: false
+      };
+      await saveData(data);
+      return { wallet, daily: wallet.daily, swappedTo: pick.label };
+    });
+    if (result.error) return res.status(400).json(result);
+    res.json(result);
+  } catch (e) {
+    console.error('Daily reroll failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Weekly quests claim the same way dailies do, with a chest for clearing all
+// three.
+app.post('/api/weekly/claim', async (req, res) => {
+  const { user, questId } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  flagIfSuspicious(user, 'weekly/claim');
+
+  try {
+    const result = await withWriteLock(async () => {
+      const data = await loadData();
+      const wallet = data[user].wallet;
+      ensureWeeklyQuests(wallet);
+      const quest = wallet.weekly.quests.find(q => q.id === questId);
+      if (!quest) return { error: 'Unknown quest' };
+      if (quest.claimed) return { error: 'Already claimed' };
+      if (quest.progress < quest.target) return { error: 'Not finished yet' };
+
+      quest.claimed = true;
+      wallet.tokens += quest.tokens;
+      wallet.xp = (wallet.xp || 0) + quest.tokens;
+      ensureSeasonPass(wallet).xp += quest.tokens;
+
+      let bonus = 0;
+      if (wallet.weekly.quests.every(q => q.claimed) && !wallet.weekly.bonusClaimed) {
+        wallet.weekly.bonusClaimed = true;
+        bonus = WEEKLY_CLEAR_BONUS;
+        wallet.tokens += bonus;
+        wallet.xp += bonus;
+        wallet.pass.xp += bonus;
+      }
+      checkLevelUp(data, user);
+      checkAchievements(data, user);
+      await saveData(data);
+      return { wallet, weekly: wallet.weekly, bonus, pass: passSummary(wallet) };
+    });
+    if (result.error) return res.status(400).json(result);
+    res.json(result);
+  } catch (e) {
+    console.error('Weekly claim failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Season Pass
+// ---------------------------------------------------------------------------
+app.get('/api/pass', async (req, res) => {
+  const user = req.query.user;
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  try {
+    const data = await loadData();
+    res.json(passSummary(data[user].wallet));
+  } catch (e) {
+    console.error('Pass fetch failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/pass/claim', async (req, res) => {
+  const { user, tier } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  const n = Number(tier);
+  if (!Number.isInteger(n) || n < 1 || n > PASS_MAX_TIER) {
+    return res.status(400).json({ error: 'Unknown tier' });
+  }
+  flagIfSuspicious(user, 'pass/claim');
+
+  try {
+    const result = await withWriteLock(async () => {
+      const data = await loadData();
+      const wallet = data[user].wallet;
+      const pass = ensureSeasonPass(wallet);
+      if (pass.claimed.includes(n)) return { error: 'Already claimed' };
+      if (passTierOf(pass.xp) < n) return { error: 'Not reached yet' };
+
+      const reward = PASS_TIERS[n - 1].reward;
+      pass.claimed.push(n);
+      if (reward.tokens) { wallet.tokens += reward.tokens; wallet.xp = (wallet.xp || 0) + reward.tokens; }
+      if (reward.title && !wallet.titles.includes(reward.title)) wallet.titles.push(reward.title);
+      if (reward.border && !wallet.borders.includes(reward.border)) wallet.borders.push(reward.border);
+      if (reward.theme && !wallet.owned.includes(reward.theme)) wallet.owned.push(reward.theme);
+      // A crate tier opens its crates on the spot, the way the prize wheel's
+      // free crate already does — banking them would need a counter nothing
+      // else in the app knows how to spend.
+      const crates = [];
+      for (let i = 0; i < (reward.crate || 0); i++) {
+        crates.push(rollLootCrateReward(wallet));
+        updateDailyChallenges(wallet, 'lootcrate_open', 1);
+      }
+
+      checkLevelUp(data, user);
+      checkAchievements(data, user);
+      await saveData(data);
+      return { wallet, pass: passSummary(wallet), reward, crates };
+    });
+    if (result.error) return res.status(400).json(result);
+    res.json(result);
+  } catch (e) {
+    console.error('Pass claim failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
 
 // ---------------------------------------------------------------------------
 // Daily Spin Wheel

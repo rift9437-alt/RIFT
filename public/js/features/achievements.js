@@ -52,7 +52,17 @@ async function renderAchievements(){
   if(!grid || !achievementsCatalog) return;
 
   const unlocked = wallet.achievements || [];
-  const ids = Object.keys(achievementsCatalog);
+  // Unlocked first, then whatever you're closest to finishing — a wall of
+  // untouched achievements buries the one you're two races away from.
+  const ids = Object.keys(achievementsCatalog).sort((a, b) => {
+    const ua = unlocked.includes(a), ub = unlocked.includes(b);
+    if(ua !== ub) return ua ? -1 : 1;
+    const frac = id => {
+      const p = achievementsCatalog[id].progress;
+      return p && p.need ? p.have / p.need : -1;
+    };
+    return frac(b) - frac(a);
+  });
   progressEl.textContent = `${unlocked.length} / ${ids.length}`;
 
   grid.innerHTML = ids.map(id => {
@@ -66,16 +76,33 @@ async function renderAchievements(){
       if(a.reward.border) rewardBits.push(`Profile border`);
       if(a.reward.theme) rewardBits.push(`Exclusive theme`);
     }
+    // How far along, when the server has a number for it. A padlock tells you
+    // nothing; "312 / 5,000 bricks" tells you whether it's worth chasing.
+    let bar = '';
+    if(!isUnlocked && a.progress && a.progress.need > 1){
+      const pct = Math.min(100, (a.progress.have / a.progress.need) * 100);
+      bar = `
+        <div class="ach-progress">
+          <div class="ach-progress-track"><i style="width:${pct.toFixed(1)}%"></i></div>
+          <div class="ach-progress-label">${fmtNum(a.progress.have)} / ${fmtNum(a.progress.need)}</div>
+        </div>`;
+    }
     return `
       <div class="achievement-card ${isUnlocked ? 'unlocked' : ''} ${isMaskedSecret ? 'secret-locked' : ''}">
         <div class="achievement-icon">${a.icon || '🏆'}</div>
         <div class="achievement-name">${a.name}</div>
         <div class="achievement-desc">${a.desc || ''}</div>
         ${(!isMaskedSecret && rewardBits.length) ? `<div class="achievement-reward">${rewardBits.join(' · ')}</div>` : ''}
+        ${bar}
         <div class="achievement-status">${isUnlocked ? '✓ Unlocked' : (isMaskedSecret ? 'Secret' : 'Locked')}</div>
       </div>
     `;
   }).join('');
+}
+
+// Thousands separators, because "20000" and "2000" look the same at a glance.
+function fmtNum(n){
+  return (n || 0).toLocaleString('en-GB');
 }
 
 /* =========================================================
