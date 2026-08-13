@@ -315,3 +315,113 @@ body.big-hitboxes .wdi-btn { padding: 15px 14px; }
 .pass-tier.ready:hover { background: color-mix(in srgb, var(--gold) 14%, var(--bg-panel-raised)); }
 .pass-tier.claimed .pass-tier-n,
 .pass-tier.claimed .pass-tier-state { color: var(--cyan); }
+
+/* =========================================================
+   CHAT — reactions, mentions, actions
+   ========================================================= */
+.chat-note-dim { color: var(--text-dim); font-size: 10.5px; }
+
+/* Being named should catch your eye in a scrolling room. */
+.chat-mention {
+  color: var(--cyan);
+  font-weight: 600;
+}
+.chat-mention.mention-me {
+  background: color-mix(in srgb, var(--gold) 22%, transparent);
+  border-radius: 3px;
+  padding: 0 3px;
+  color: var(--gold);
+}
+.chat-msg.at-me { border-left: 2px solid var(--gold); padding-left: 8px; }
+
+/* /me — an action, not a line of dialogue, so it drops the name header. */
+.chat-action {
+  font-style: italic;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 3px 0;
+}
+
+.chat-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.chat-react {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  line-height: 1;
+  padding: 3px 7px;
+  cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+.chat-react:hover { border-color: var(--cyan); color: var(--text); }
+.chat-react.on { border-color: var(--cyan); color: var(--cyan); }
+
+/* The + only reveals its options on hover/focus, so a quiet message stays
+   quiet and a busy one doesn't become a wall of faces. */
+.chat-react-add { position: relative; display: inline-flex; }
+.chat-react-more { opacity: 0.4; }
+.chat-react-add:hover .chat-react-more { opacity: 1; }
+.chat-react-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 4px;
+  display: none;
+  gap: 2px;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 5;
+}
+.chat-react-add:hover .chat-react-menu,
+.chat-react-add:focus-within .chat-react-menu { display: flex; }
+.chat-react-menu button {
+  background: none;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  padding: 3px 4px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+.chat-react-menu button:hover { background: var(--bg); }
+
+/* ---- friend activity feed --------------------------------------------- */
+.feed-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  font-size: 12.5px;
+}
+.feed-row:last-child { border-bottom: none; }
+.feed-icon { flex: 0 0 18px; text-align: center; }
+.feed-text { flex: 1; min-width: 0; color: var(--text-dim); }
+.feed-text b {
+  color: var(--text);
+  cursor: pointer;
+  border-bottom: 1px dotted transparent;
+}
+.feed-text b:hover { color: var(--cyan); border-bottom-color: var(--cyan); }
+.feed-row.mine .feed-text b { color: var(--gold); }
+.feed-when {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.feed-empty {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  padding: 14px 0;
+}

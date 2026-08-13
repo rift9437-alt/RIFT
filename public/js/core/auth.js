@@ -79,6 +79,7 @@ function afterLogin(){
   refreshCabinets();
   openChatDock();
   startChatPolling();
+  if(typeof startFeedPolling === 'function') startFeedPolling();
   if(typeof TV !== 'undefined') TV.start();
   if(typeof renderRival === 'function') setTimeout(renderRival, 800);
   if(typeof wireSecretSpots === 'function') wireSecretSpots();
@@ -95,6 +96,7 @@ function logout(){
   stopGlobalPolling();
   stopPlaytimeHeartbeat();
   stopChatPolling();
+  if(typeof stopFeedPolling === 'function') stopFeedPolling();
   hideChatDock();
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_TOKEN_KEY);

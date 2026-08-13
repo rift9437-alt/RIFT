@@ -503,6 +503,7 @@ function checkAchievements(data, user) {
     if (SEASON_ACHIEVEMENTS[id] && SEASON_ACHIEVEMENTS[id] !== CURRENT_SEASON) continue;
     wallet.achievements.push(id);
     newlyUnlocked.push(id);
+    if (!ACHIEVEMENTS[id].secret) pushFeed(user, 'achievement', ACHIEVEMENTS[id].name);
     const reward = ACHIEVEMENTS[id].reward || {};
     if (typeof reward.tokens === 'number') wallet.tokens += reward.tokens;
     if (reward.title && !wallet.titles.includes(reward.title)) wallet.titles.push(reward.title);
@@ -599,6 +600,8 @@ function checkLevelUp(data, user) {
   const levelsGained = [];
   for (let lvl = prevLevel + 1; lvl <= newLevel; lvl++) {
     levelsGained.push(lvl);
+    // Only the round numbers — a feed of every single level-up is noise.
+    if (lvl % 10 === 0) pushFeed(user, 'level', 'Level ' + lvl);
     wallet.tokens += levelUpTokenReward(lvl);
     const milestone = LEVEL_MILESTONE_REWARDS[lvl];
     if (milestone) {
@@ -1397,6 +1400,30 @@ async function initDb() {
     )
   `);
   await pool.query('CREATE INDEX IF NOT EXISTS chat_id_idx ON chat (id DESC)');
+  // Reactions live beside the message rather than inside it, so a room full
+  // of people reacting never rewrites the message row.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS chat_reactions (
+      message_id BIGINT NOT NULL REFERENCES chat(id) ON DELETE CASCADE,
+      username TEXT NOT NULL,
+      emoji TEXT NOT NULL,
+      PRIMARY KEY (message_id, username, emoji)
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS chat_reactions_msg_idx ON chat_reactions (message_id)');
+  // A short log of things worth telling your friends about. Deliberately
+  // small and append-only: it's a feed, not an audit trail, and it's trimmed
+  // on write so it can't grow without bound.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS feed (
+      id BIGSERIAL PRIMARY KEY,
+      username TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      detail TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS feed_id_idx ON feed (id DESC)');
 
   // Community-created cosmetics: submissions + one-vote-per-category-per-month.
   await pool.query(`
@@ -1968,7 +1995,52 @@ function chatSpamCheck(username){
 }
 
 function chatRowToMessage(row) {
-  return { id: Number(row.id), user: row.username, text: row.body, at: row.created_at };
+  return { id: Number(row.id), user: row.username, text: row.body, at: row.created_at, reactions: {} };
+}
+
+// The set of reactions people are allowed to leave. A fixed list rather than
+// arbitrary text: it keeps the row narrow, keeps the render predictable, and
+// means nobody can smuggle a paragraph in through the reaction field.
+const CHAT_REACTIONS = ['👍', '😂', '🔥', '💀', '👀', '🎉'];
+
+// ---------------------------------------------------------------------------
+// Activity feed
+// ---------------------------------------------------------------------------
+// Written from the places that already know something notable happened. Fire
+// and forget on purpose: a feed row failing must never fail the thing that
+// caused it, so this swallows its own errors rather than propagating them
+// into a payout or an unlock.
+const FEED_KEEP_ROWS = 400;
+function pushFeed(username, kind, detail) {
+  pool.query('INSERT INTO feed (username, kind, detail) VALUES ($1, $2, $3) RETURNING id',
+             [username, kind, String(detail || '').slice(0, 120)])
+    .then(r => {
+      if (Number(r.rows[0].id) % 50 !== 0) return;
+      return pool.query(
+        'DELETE FROM feed WHERE id <= (SELECT id FROM feed ORDER BY id DESC OFFSET $1 LIMIT 1)',
+        [FEED_KEEP_ROWS]
+      );
+    })
+    .catch(e => console.error('Feed write failed (ignored):', e.message));
+}
+
+// Folds reactions onto a batch of messages in one query rather than one per
+// message — a 200-message backfill would otherwise be 200 round trips.
+async function attachReactions(messages) {
+  if (!messages.length) return messages;
+  const ids = messages.map(m => m.id);
+  const { rows } = await pool.query(
+    'SELECT message_id, username, emoji FROM chat_reactions WHERE message_id = ANY($1::bigint[])',
+    [ids]
+  );
+  const byId = new Map(messages.map(m => [m.id, m]));
+  rows.forEach(r => {
+    const m = byId.get(Number(r.message_id));
+    if (!m) return;
+    if (!m.reactions[r.emoji]) m.reactions[r.emoji] = [];
+    m.reactions[r.emoji].push(r.username);
+  });
+  return messages;
 }
 
 async function loadChatSince(since) {
@@ -1977,13 +2049,13 @@ async function loadChatSince(since) {
       'SELECT id, username, body, created_at FROM chat WHERE id > $1 ORDER BY id ASC LIMIT 200',
       [since]
     );
-    return rows.map(chatRowToMessage);
+    return attachReactions(rows.map(chatRowToMessage));
   }
   const { rows } = await pool.query(
     'SELECT id, username, body, created_at FROM chat ORDER BY id DESC LIMIT $1',
     [CHAT_BACKLOG]
   );
-  return rows.reverse().map(chatRowToMessage);
+  return attachReactions(rows.reverse().map(chatRowToMessage));
 }
 
 app.get('/api/chat', async (req, res) => {
@@ -2039,6 +2111,79 @@ app.post('/api/chat', async (req, res) => {
     res.json({ messages });
   } catch (e) {
     console.error('Chat post failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Toggling a reaction: pressing the same one again takes it back off. The
+// row is the record, so there's no count to get out of step with who reacted.
+app.post('/api/chat/react', async (req, res) => {
+  const { user, messageId, emoji } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  if (!CHAT_REACTIONS.includes(emoji)) return res.status(400).json({ error: 'Unknown reaction' });
+  const id = Number(messageId);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Unknown message' });
+
+  try {
+    const del = await pool.query(
+      'DELETE FROM chat_reactions WHERE message_id = $1 AND username = $2 AND emoji = $3',
+      [id, user, emoji]
+    );
+    if (del.rowCount === 0) {
+      // ON CONFLICT rather than a check-then-insert: two taps in flight at
+      // once would otherwise both see "not there" and one would throw.
+      const ins = await pool.query(
+        'INSERT INTO chat_reactions (message_id, username, emoji) VALUES ($1, $2, $3) ' +
+        'ON CONFLICT DO NOTHING RETURNING message_id',
+        [id, user, emoji]
+      );
+      if (ins.rowCount === 0 && del.rowCount === 0) {
+        // The message is gone (trimmed out of the archive).
+        return res.status(404).json({ error: 'That message is no longer here.' });
+      }
+    }
+    const { rows } = await pool.query(
+      'SELECT username, emoji FROM chat_reactions WHERE message_id = $1', [id]
+    );
+    const reactions = {};
+    rows.forEach(r => {
+      if (!reactions[r.emoji]) reactions[r.emoji] = [];
+      reactions[r.emoji].push(r.username);
+    });
+    broadcastEvent('chat:react', { messageId: id, reactions });
+    res.json({ messageId: id, reactions });
+  } catch (e) {
+    // A reaction on a message that has since been trimmed hits the foreign
+    // key; that's a 404, not a server fault.
+    if (e && e.code === '23503') return res.status(404).json({ error: 'That message is no longer here.' });
+    console.error('Chat react failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.get('/api/chat/reactions', (req, res) => res.json({ options: CHAT_REACTIONS }));
+
+// Your friends' recent doings, newest first. Falls back to the whole arcade
+// when you haven't added anyone yet — an empty panel teaches nothing, and
+// seeing what other people are up to is how you find someone to add.
+app.get('/api/feed', async (req, res) => {
+  const user = authenticate(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+  try {
+    const data = await loadData();
+    const friends = (data[user] && data[user].wallet && data[user].wallet.friends) || [];
+    const scope = friends.length ? friends.concat([user]) : USERS;
+    const { rows } = await pool.query(
+      'SELECT username, kind, detail, created_at FROM feed WHERE username = ANY($1::text[]) ORDER BY id DESC LIMIT 25',
+      [scope]
+    );
+    res.json({
+      friendsOnly: friends.length > 0,
+      items: rows.map(r => ({ user: r.username, kind: r.kind, detail: r.detail, at: r.created_at }))
+    });
+  } catch (e) {
+    console.error('Feed load failed:', e);
     res.status(500).json({ error: 'Internal error' });
   }
 });
@@ -3094,6 +3239,7 @@ app.post('/api/prestige', async (req, res) => {
       const nextTier = (wallet.prestige || 0) + 1;
       const tier = PRESTIGE_TIERS[nextTier];
       wallet.prestige = nextTier;
+      pushFeed(user, 'prestige', tier.name);
       wallet.prestigeBadgeColor = tier.badgeColor;
       wallet.tokens += tier.tokenReward;
       if (!wallet.titles.includes(tier.title)) wallet.titles.push(tier.title);
@@ -3276,6 +3422,7 @@ app.post('/api/weekly/claim', async (req, res) => {
       let bonus = 0;
       if (wallet.weekly.quests.every(q => q.claimed) && !wallet.weekly.bonusClaimed) {
         wallet.weekly.bonusClaimed = true;
+        pushFeed(user, 'weekly', 'Cleared every weekly quest');
         bonus = WEEKLY_CLEAR_BONUS;
         wallet.tokens += bonus;
         wallet.xp += bonus;
@@ -3329,6 +3476,7 @@ app.post('/api/pass/claim', async (req, res) => {
 
       const reward = PASS_TIERS[n - 1].reward;
       pass.claimed.push(n);
+      if (n % 5 === 0) pushFeed(user, 'pass', 'Reached season tier ' + n);
       if (reward.tokens) { wallet.tokens += reward.tokens; wallet.xp = (wallet.xp || 0) + reward.tokens; }
       if (reward.title && !wallet.titles.includes(reward.title)) wallet.titles.push(reward.title);
       if (reward.border && !wallet.borders.includes(reward.border)) wallet.borders.push(reward.border);
@@ -5297,6 +5445,7 @@ wss.on('connection', ws => {
           mpBroadcastRoom(room, 'mp:finish', {
             user: ws.username, place, time: p.finished - room.startedAt
           });
+          if (place === 1) pushFeed(ws.username, 'kart', 'Won a race in Rift Kart');
           awardKartFinish(ws.username, place).catch(e =>
             console.error('Kart payout failed:', e));
         }

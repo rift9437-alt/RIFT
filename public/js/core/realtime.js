@@ -210,6 +210,13 @@ const Realtime = (function(){
    Everything the socket pushes lands in code that already existed for the
    polling path, so there's one way for each kind of update to be applied. */
 
+// A reaction is a change to a message that's already on screen, so it comes
+// down its own channel rather than resending the message.
+Realtime.on('chat:react', payload => {
+  if(!payload || typeof applyReactions !== 'function') return;
+  applyReactions(payload.messageId, payload.reactions);
+});
+
 Realtime.on('chat', payload => {
   if(!payload || !payload.message) return;
   if(typeof ingestChatMessages === 'function') ingestChatMessages([payload.message], false);
