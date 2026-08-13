@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="css/season.css">
   <link rel="stylesheet" href="css/robot.css">
   <link rel="stylesheet" href="css/whodidit.css">
+  <link rel="stylesheet" href="css/palette.css">
 </head>
 <body>
 <div class="scanlines"></div>
@@ -1734,7 +1735,64 @@
       <span>SCREEN SHAKE</span>
       <div class="toggle" id="setting-shake" onclick="toggleSetting('shake')"></div>
     </div>
+
+    <div class="settings-group">VOLUME</div>
+    <div class="settings-row settings-row-slider">
+      <span>SOUND EFFECTS</span>
+      <input type="range" id="setting-sfx-vol" min="0" max="1" step="0.05"
+             oninput="setSetting('sfxVolume', this.value, true)"
+             onchange="setSetting('sfxVolume', this.value)">
+      <b id="setting-sfx-vol-label">85%</b>
+    </div>
+    <div class="settings-row settings-row-slider">
+      <span>MENU MUSIC</span>
+      <input type="range" id="setting-music-vol" min="0" max="1" step="0.05"
+             oninput="setSetting('musicVolume', this.value, true)"
+             onchange="setSetting('musicVolume', this.value)">
+      <b id="setting-music-vol-label">50%</b>
+    </div>
+
+    <div class="settings-group">ACCESSIBILITY</div>
+    <div class="settings-row settings-row-slider">
+      <span>TEXT SIZE</span>
+      <input type="range" id="setting-text-scale" min="0.9" max="1.35" step="0.05"
+             oninput="setSetting('textScale', this.value, true)"
+             onchange="setSetting('textScale', this.value)">
+      <b id="setting-text-scale-label">100%</b>
+    </div>
+    <div class="settings-row">
+      <span>REDUCE MOTION<i>stills the flicker, the drifting background and the toasts</i></span>
+      <div class="toggle" id="setting-reduce-motion" onclick="toggleSetting('reduceMotion')"></div>
+    </div>
+    <div class="settings-row">
+      <span>HIGH CONTRAST<i>firmer borders and full-strength text</i></span>
+      <div class="toggle" id="setting-high-contrast" onclick="toggleSetting('highContrast')"></div>
+    </div>
+    <div class="settings-row">
+      <span>LARGER CONTROLS<i>bigger targets on the small buttons</i></span>
+      <div class="toggle" id="setting-big-hitboxes" onclick="toggleSetting('bigHitboxes')"></div>
+    </div>
+
     <button class="btn btn-primary" onclick="closeSettings()">Done</button>
+  </div>
+</div>
+
+<!-- ============ COMMAND PALETTE (Ctrl/⌘+K) ============ -->
+<div id="palette-modal" class="modal-overlay hidden" onclick="if(event.target===this) closePalette()">
+  <div class="palette-card">
+    <input id="palette-input" class="palette-input" type="text" autocomplete="off"
+           placeholder="Jump to a cabinet, a screen, an action…" oninput="renderPalette()">
+    <div id="palette-list" class="palette-list"></div>
+    <div class="palette-foot"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>↵</kbd> go · <kbd>esc</kbd> close</div>
+  </div>
+</div>
+
+<!-- ============ KEYBOARD SHORTCUTS (?) ============ -->
+<div id="shortcut-modal" class="modal-overlay hidden" onclick="if(event.target===this) closeShortcutSheet()">
+  <div class="modal-card modal-card-wide">
+    <h3>⌨ KEYBOARD</h3>
+    <div id="shortcut-body"></div>
+    <button class="btn btn-primary" onclick="closeShortcutSheet()">Done</button>
   </div>
 </div>
 
@@ -2309,6 +2367,7 @@
 <script src="js/features/clans.js"></script>
 <script src="js/features/gazette.js"></script>
 <script src="js/features/qol.js"></script>
+<script src="js/features/palette.js"></script>
 <script src="js/features/results.js"></script>
 <script src="js/features/shopplus.js"></script>
 <script src="js/features/collection.js"></script>

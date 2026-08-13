@@ -79,7 +79,9 @@ async function checkPendingGifts(){
 }
 
 async function handleEquip(itemId){
-  const msg = document.getElementById('shop-message');
+  // The message line only exists while the shop screen is built, and equipping
+  // can now be triggered from elsewhere (the collection, the palette).
+  const msg = document.getElementById('shop-message') || { textContent: '' };
   msg.textContent = '';
   try{
     const res = await apiFetch(`${LB_API_BASE}/wallet/equip`, {

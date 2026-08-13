@@ -1,0 +1,208 @@
+/* =========================================================
+   COMMAND PALETTE, SHORTCUT SHEET, ACCESSIBILITY
+   ========================================================= */
+
+/* ---- command palette -------------------------------------------------- */
+/* Sits high rather than centred: the list grows downward and a centred box
+   would jump around as you type. */
+#palette-modal { align-items: flex-start; padding-top: 12vh; }
+
+.palette-card {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.palette-input {
+  width: 100%;
+  background: var(--bg);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  padding: 16px 18px;
+  outline: none;
+}
+.palette-input::placeholder { color: var(--text-dim); }
+
+.palette-list { max-height: 46vh; overflow-y: auto; }
+
+.palette-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  text-align: left;
+  padding: 11px 18px;
+  cursor: pointer;
+}
+.palette-row:hover { background: var(--bg-panel-raised); }
+.palette-row.sel {
+  background: var(--bg-panel-raised);
+  border-left-color: var(--cyan);
+}
+.palette-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.palette-label { flex: 1; min-width: 0; }
+.palette-hint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.palette-empty {
+  padding: 26px 18px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.palette-foot {
+  border-top: 1px solid var(--border);
+  padding: 8px 18px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+/* ---- shortcut sheet --------------------------------------------------- */
+.ks-group-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 16px 0 8px;
+}
+.ks-group-title:first-child { margin-top: 8px; }
+.ks-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 12.5px;
+}
+.ks-row span { color: var(--text-dim); }
+
+kbd, .palette-foot kbd {
+  display: inline-block;
+  min-width: 20px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text);
+  text-align: center;
+}
+.ks-row kbd { flex: 0 0 auto; min-width: 78px; }
+
+/* ---- settings additions ----------------------------------------------- */
+.settings-group {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  margin: 16px 0 4px;
+  padding-top: 12px;
+}
+/* The explanatory line under a setting's name. */
+.settings-row i {
+  display: block;
+  font-style: normal;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-dim);
+  margin-top: 3px;
+  max-width: 260px;
+}
+.settings-row-slider { gap: 12px; }
+.settings-row-slider input[type=range] {
+  flex: 1;
+  min-width: 90px;
+  accent-color: var(--cyan);
+  background: transparent;
+}
+.settings-row-slider b {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--gold);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ---- accessibility modes ---------------------------------------------- */
+/* One knob, applied at the root, so every rem-based size follows. Sizes in the
+   app are mostly px, so this also nudges the base font for anything that
+   inherits. */
+:root { --text-scale: 1; }
+body { font-size: calc(15px * var(--text-scale)); }
+body .dash-content,
+body .clans-wrap,
+body .modal-card,
+body .lb-card { font-size: calc(1em * var(--text-scale)); }
+
+/* Reduce motion: kill the decorative animation, keep the functional bits.
+   Transitions stay short rather than zero so focus and hover still read. */
+body.reduce-motion *,
+body.reduce-motion *::before,
+body.reduce-motion *::after {
+  animation-duration: 0.001s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.06s !important;
+}
+body.reduce-motion .scanlines,
+body.reduce-motion .floating-emote,
+body.reduce-motion .victory-layer { display: none; }
+body.reduce-motion .cabinet:hover { transform: none; }
+
+/* High contrast: full-strength text, harder edges, no dimming. */
+body.high-contrast {
+  --text-dim: var(--text);
+  --border: color-mix(in srgb, var(--text) 55%, var(--bg));
+}
+body.high-contrast .cabinet,
+body.high-contrast .lb-card,
+body.high-contrast .modal-card,
+body.high-contrast .clan-card { border-width: 2px; }
+body.high-contrast .cab-tag,
+body.high-contrast .filter-chip { border-width: 2px; }
+
+/* Larger controls: the small icon buttons and chips get real target sizes.
+   24px is genuinely hard to hit; this takes them to 44. */
+body.big-hitboxes .icon-btn,
+body.big-hitboxes .clan-mini,
+body.big-hitboxes .fav-star,
+body.big-hitboxes .emote-btn {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 17px;
+}
+body.big-hitboxes .btn { padding: 16px 24px; }
+body.big-hitboxes .filter-chip,
+body.big-hitboxes .shop-btn { padding: 12px 18px; }
+body.big-hitboxes .wdi-btn { padding: 15px 14px; }
+
+@media (max-width: 560px) {
+  #palette-modal { padding-top: 6vh; }
+  .palette-input { font-size: 14px; padding: 14px 15px; }
+  .ks-row { flex-wrap: wrap; }
+}

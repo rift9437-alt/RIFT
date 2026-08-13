@@ -34,7 +34,8 @@ const Sfx = (function(){
     try{
       audio = new AC();
       master = audio.createGain();
-      master.gain.value = 0.85;
+      master.gain.value = (typeof settings !== 'undefined' && typeof settings.sfxVolume === 'number')
+        ? settings.sfxVolume : 0.85;
       master.connect(audio.destination);
     }catch(e){ audio = null; }
     return audio;
@@ -97,5 +98,15 @@ const Sfx = (function(){
     }catch(e){ /* audio is a nice-to-have, never break the game for it */ }
   }
 
-  return { play };
+  // Settings owns the number; this just applies it. Ramped rather than set so
+  // dragging the slider doesn't click through the speakers.
+  function setVolume(v){
+    if(!master || !audio) return;
+    const clamped = Math.max(0, Math.min(1, Number(v)));
+    if(!Number.isFinite(clamped)) return;
+    try{ master.gain.setTargetAtTime(clamped, audio.currentTime, 0.02); }
+    catch(e){ master.gain.value = clamped; }
+  }
+
+  return { play, setVolume };
 })();

@@ -136,6 +136,12 @@ function scorePop(text, style){
 const MenuMusic = (function(){
   let ctxA = null, master = null, timer = null, step = 0, on = false;
   const SCALE = [220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+  // Background music wants to sit well under the effects, so the slider runs
+  // 0–1 over a ceiling rather than straight into the gain.
+  const MUSIC_CEILING = 0.10;
+  const musicLevel = () =>
+    (typeof settings !== 'undefined' && typeof settings.musicVolume === 'number')
+      ? Math.max(0, Math.min(1, settings.musicVolume)) : 0.5;
 
   function ensure(){
     if(ctxA) return ctxA;
@@ -144,7 +150,7 @@ const MenuMusic = (function(){
     try{
       ctxA = new AC();
       master = ctxA.createGain();
-      master.gain.value = 0.05;
+      master.gain.value = MUSIC_CEILING * musicLevel();
       master.connect(ctxA.destination);
     }catch(e){ ctxA = null; }
     return ctxA;
@@ -175,6 +181,13 @@ const MenuMusic = (function(){
 
   return {
     isOn(){ return on; },
+    // Called by applySettings whenever the slider moves.
+    setVolume(v){
+      if(!master || !ctxA) return;
+      const g = MUSIC_CEILING * Math.max(0, Math.min(1, Number(v) || 0));
+      try{ master.gain.setTargetAtTime(g, ctxA.currentTime, 0.05); }
+      catch(e){ master.gain.value = g; }
+    },
     start(){
       if(on) return;
       if(!ensure()) return;
@@ -199,6 +212,8 @@ const MenuMusic = (function(){
     }
   };
 })();
+
+function setMusicVolume(v){ MenuMusic.setVolume(v); }
 
 function toggleMenuMusic(){
   const on = MenuMusic.toggle();
