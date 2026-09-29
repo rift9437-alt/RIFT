@@ -61,6 +61,37 @@ function paletteEntries(){
                run:()=>{ backToDashboard(); document.getElementById('daily-panel')
                           .scrollIntoView({ behavior:'smooth', block:'center' }); } });
   }
+  // People. Jumping to a profile was several clicks from anywhere that wasn't
+  // the leaderboard.
+  USERS.filter(u => u !== currentUser).forEach(u => {
+    out.push({
+      icon: '👤', label: u, hint: 'Profile', keywords: 'player profile who stats compare',
+      run: () => { stopAllGames(); showScreen('profile-screen'); renderProfile(u); }
+    });
+  });
+
+  // Achievements, so "what do I need for Road Warrior" is one search rather
+  // than a scroll through fifty cards.
+  if(achievementsCatalog){
+    Object.entries(achievementsCatalog).forEach(([id, a]) => {
+      if(a.secret && !(wallet.achievements || []).includes(id)) return;
+      out.push({
+        icon: a.icon || '🏆', label: a.name, hint: 'Achievement',
+        keywords: 'achievement badge unlock ' + (a.desc || ''),
+        run: () => {
+          stopAllGames();
+          showScreen('achievements-screen');
+          renderAchievements();
+          // Land on the one they searched for rather than the top of the grid.
+          setTimeout(() => {
+            const card = [...document.querySelectorAll('.achievement-name')]
+              .find(el => el.textContent.trim() === a.name);
+            if(card) card.closest('.achievement-card').scrollIntoView({ behavior:'smooth', block:'center' });
+          }, 400);
+        }
+      });
+    });
+  }
   return out;
 }
 
@@ -72,9 +103,12 @@ function paletteScore(entry, q){
   if(!q) return 1;
   const hay = (entry.label + ' ' + (entry.keywords || '')).toLowerCase();
   const label = entry.label.toLowerCase();
-  if(label.startsWith(q)) return 1000;
-  if(label.includes(q)) return 500;
-  if(hay.includes(q)) return 200;
+  // A cabinet beats a player beats an achievement when the text is equally
+  // close — you search for something to play far more often than for a name.
+  const weight = entry.hint === 'Profile' ? 0.8 : entry.hint === 'Achievement' ? 0.65 : 1;
+  if(label.startsWith(q)) return 1000 * weight;
+  if(label.includes(q)) return 500 * weight;
+  if(hay.includes(q)) return 200 * weight;
   // subsequence: every letter of the query in order somewhere in the label
   let i = 0, gaps = 0;
   for(const ch of label){
@@ -282,6 +316,22 @@ document.addEventListener('keydown', e => {
   }
   if(typing) return;
 
+  // Z toggles zen anywhere, including mid-game — it hides chrome, it doesn't
+  // touch the game, so it's safe while something is running.
+  if(e.key.toLowerCase() === 'z' && !e.ctrlKey && !e.metaKey && !e.altKey){
+    e.preventDefault();
+    toggleZen();
+    return;
+  }
+  if(e.key === 'Escape' && settings.zen){
+    // Escape normally pauses. In zen it means "give me the arcade back", and
+    // only that — doing both at once would be a confusing double effect. A
+    // second press pauses as usual.
+    e.preventDefault();
+    e.stopPropagation();
+    toggleZen();
+    return;
+  }
   if(e.key === '?'){
     e.preventDefault();
     document.getElementById('shortcut-modal').classList.contains('hidden')

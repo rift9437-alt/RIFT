@@ -327,6 +327,7 @@ function renderCabinets(){
         <div class="cabinet-desc">${cab.desc}</div>
         <div class="cabinet-stat">${cab.stat}</div>
         <div class="cabinet-best">${cabinetBestText(cab)}</div>
+        ${typeof masteryStars === 'function' ? masteryStars(cab.id) : ''}
         ${recentIdx >= 0 ? `<div class="cabinet-recent-badge">🕒 ${recentIdx === 0 ? 'Last played' : '#' + (recentIdx+1) + ' recent'}</div>` : ''}
       </div>
     `;

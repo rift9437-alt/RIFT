@@ -170,3 +170,85 @@
   padding-left: 8px;
   background: color-mix(in srgb, var(--gold) 6%, transparent);
 }
+
+/* ---- zen mode ---------------------------------------------------------- */
+/* Everything that isn't the cabinet goes. Kept to one place so there's no
+   question about what "zen" hides, and it's all display:none rather than
+   opacity, so nothing is still there catching clicks. */
+body.zen .topbar,
+body.zen #chat-dock,
+body.zen .notif-panel,
+body.zen .game-topbar,
+body.zen .scanlines,
+body.zen #toast-stack { display: none !important; }
+body.zen .screen { padding-top: 10px; }
+body.zen .play-area { margin-top: 0; }
+/* A way back that doesn't need the topbar you just hid. */
+body.zen::after {
+  content: "ZEN · Z or ESC to exit";
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+/* ---- cabinet mastery --------------------------------------------------- */
+.cab-mastery {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--cab-accent, var(--gold));
+  margin-top: 3px;
+}
+
+/* ---- first-run tour ---------------------------------------------------- */
+/* Deliberately not a modal: no backdrop that eats clicks, so somebody who'd
+   rather just play can carry on straight through it. */
+#tour-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10500; }
+#tour-ring {
+  position: absolute;
+  border: 2px solid var(--gold);
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(4, 6, 10, 0.55), 0 0 22px rgba(255, 200, 87, 0.5);
+  transition: top .25s, left .25s, width .25s, height .25s;
+  pointer-events: none;
+}
+#tour-card {
+  position: absolute;
+  width: 320px;
+  background: var(--bg-panel);
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+  transition: top .25s, left .25s;
+}
+#tour-card h4 {
+  margin: 4px 0 6px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text);
+}
+#tour-card p { margin: 0; font-size: 12.5px; color: var(--text-dim); line-height: 1.55; }
+.tour-step {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--gold);
+}
+.tour-actions { display: flex; gap: 8px; margin-top: 14px; }
+.tour-actions .btn { flex: 1; margin-top: 0; width: auto; padding: 10px 12px; }
+
+@media (max-width: 560px) {
+  #tour-card { width: auto; left: 12px !important; right: 12px; }
+}

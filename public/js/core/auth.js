@@ -81,6 +81,7 @@ function afterLogin(){
   startChatPolling();
   if(typeof startFeedPolling === 'function') startFeedPolling();
   if(typeof startNotifPolling === 'function') startNotifPolling();
+  if(typeof maybeStartTour === 'function') maybeStartTour();
   if(typeof TV !== 'undefined') TV.start();
   if(typeof renderRival === 'function') setTimeout(renderRival, 800);
   if(typeof wireSecretSpots === 'function') wireSecretSpots();

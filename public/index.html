@@ -1822,9 +1822,30 @@
       <span>LARGER CONTROLS<i>bigger targets on the small buttons</i></span>
       <div class="toggle" id="setting-big-hitboxes" onclick="toggleSetting('bigHitboxes')"></div>
     </div>
+    <div class="settings-row settings-row-slider">
+      <span>COLOUR VISION<i>keeps the three accent colours apart</i></span>
+      <select id="setting-colour-mode" class="clan-input" style="margin:0; max-width:150px;"
+              onchange="setColourMode(this.value)">
+        <option value="off">Default</option>
+        <option value="deuter">Deuteranopia</option>
+        <option value="prot">Protanopia</option>
+        <option value="trit">Tritanopia</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <span>ZEN MODE<i>hides everything but the cabinet &mdash; press Z in a game</i></span>
+      <div class="toggle" id="setting-zen" onclick="toggleZen()"></div>
+    </div>
 
+    <button class="btn btn-secondary" onclick="replayTour()">Replay the tour</button>
     <button class="btn btn-primary" onclick="closeSettings()">Done</button>
   </div>
+</div>
+
+<!-- ============ FIRST-RUN TOUR ============ -->
+<div id="tour-layer" class="hidden">
+  <div id="tour-ring"></div>
+  <div id="tour-card"></div>
 </div>
 
 <!-- ============ COMMAND PALETTE (Ctrl/⌘+K) ============ -->
@@ -2421,6 +2442,8 @@
 <script src="js/features/palette.js"></script>
 <script src="js/features/feed.js"></script>
 <script src="js/features/notify.js"></script>
+<script src="js/features/mastery.js"></script>
+<script src="js/features/tour.js"></script>
 <script src="js/features/results.js"></script>
 <script src="js/features/shopplus.js"></script>
 <script src="js/features/collection.js"></script>

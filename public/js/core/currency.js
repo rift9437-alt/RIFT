@@ -37,6 +37,8 @@ function applyTheme(itemId){
   else document.documentElement.style.removeProperty('--text');
   if(item.textDim) document.documentElement.style.setProperty('--text-dim', item.textDim);
   else document.documentElement.style.removeProperty('--text-dim');
+  // A colour-vision mode outranks the theme's own accents.
+  if(typeof reapplyColourMode === 'function') reapplyColourMode();
   if(item.image){
     document.documentElement.style.setProperty('--theme-image', `url("${item.image}")`);
     document.documentElement.classList.add('theme-image-active');
