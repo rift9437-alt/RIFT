@@ -80,6 +80,10 @@ const KartGame = (function(){
   let drift = 0, driftDir = 0, boost = 0, boostPads = [];
   let lapTimes = [];
   let itemBoxes = [], myItem = null, spinUntil = 0, itemFlash = 0, canFire = false;
+  // Time trial: the same circuit with the items switched off and your ghost
+  // for company. Racing is about what everyone else does to you; a trial is
+  // only about the line you take, which is a different thing to be good at.
+  let timeTrial = false;
   // Ghost: a translucent kart replaying your own best lap on this track. It's
   // recorded as you drive and only replaces the stored one when you actually
   // go quicker, so what you're chasing is always your personal best. Kept per
@@ -566,6 +570,7 @@ const KartGame = (function(){
     const out = [];
     const spin = frame * 0.045;
     itemBoxes.forEach((b, i) => {
+      if(timeTrial) return;             // no items in a trial
       if(!(mpBoxMask & (1 << i))) return;
       const bob = Math.sin(frame * 0.06 + i) * 0.18;
       const cube = Mini3D.box(0, 1.15 + bob, 0, 1.15, 1.15, 1.15, '#ffc857',
@@ -614,6 +619,7 @@ const KartGame = (function(){
   // The item you're carrying, front and centre where you'll see it without
   // taking your eyes off the road.
   function drawItemSlot(){
+    if(timeTrial) return;
     const x = W/2, y = 42, size = 46;
     ctx.save();
     ctx.fillStyle = 'rgba(6,9,15,0.6)';
@@ -792,6 +798,22 @@ const KartGame = (function(){
   function showKartResults(){
     const box = document.getElementById('kart-result');
     if(!box) return;
+    // A trial has no finish order to report — it's you, the clock and your
+    // own best, so the board would be an empty table.
+    if(timeTrial){
+      const total = Date.now() - raceStart;
+      const beat = ghostBest && bestLap && bestLap <= ghostBest.ms;
+      document.getElementById('kart-result-text').textContent =
+        beat ? '⏱ NEW BEST LAP' : '⏱ TRIAL OVER';
+      document.getElementById('kart-result-sub').textContent =
+        `${(total/1000).toFixed(1)}s for ${LAPS} laps · best lap ${(bestLap/1000).toFixed(1)}s`;
+      document.getElementById('kart-result-board').innerHTML =
+        lapTimes.length
+          ? `<div class="trn-empty">Laps: ${lapTimes.map(t => (t/1000).toFixed(1) + 's').join(' · ')}</div>`
+          : '';
+      box.classList.remove('hidden');
+      return;
+    }
     const mine = mpFinishOrder.find(f => f.user === currentUser);
     document.getElementById('kart-result-text').textContent =
       mine ? (mine.place === 1 ? '🏆 WINNER' : `P${mine.place}`) : 'FINISHED';
@@ -822,6 +844,7 @@ const KartGame = (function(){
   // burn through a box the instant you touch it. The server checks you really
   // have the item, so the worst a stray press does is waste a message.
   function onKeyPress(name){
+    if(timeTrial) return;
     if(name !== 'space' && name !== 'e') return;
     if(!myItem || !canFire || finished || countdownLeft() > 0) return;
     Realtime.send({ type: 'mp:kart-use' });
@@ -836,7 +859,25 @@ const KartGame = (function(){
     rafId = requestAnimationFrame(loop);
   }
 
+  // Entered from the lobby like a race, but solo and without the item layer.
+  function startTimeTrial(track){
+    timeTrial = true;
+    showScreen('kart-screen');
+    useTrack(track || 'loop');
+    reset();
+    // No countdown to wait for — a trial starts when you do.
+    mpStartsAt = 0;
+    raceStart = Date.now();
+    paused = false; running = true;
+    if(typeof toast === 'function'){
+      toast('Time trial', ghostBest ? `Chasing your ${(ghostBest.ms/1000).toFixed(1)}s` : 'Set a lap to chase',
+            '⏱', 'cyan');
+    }
+    loop();
+  }
+
   function start(){
+    timeTrial = false;
     showScreen('kart-screen');
     useTrack(typeof mpRoom !== 'undefined' && mpRoom ? mpRoom.track : 'loop');
     reset();
@@ -854,5 +895,5 @@ const KartGame = (function(){
   function isRunning(){ return running; }
 
   return { start, stop, reset, onKeyPress, pause, resume, isPaused, isRunning,
-           gotItem, fizzled, itemBoost, droppedNearby, struck };
+           gotItem, fizzled, itemBoost, droppedNearby, struck, startTimeTrial };
 })();

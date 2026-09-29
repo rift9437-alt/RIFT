@@ -235,7 +235,10 @@ const REASON_QTY_CAPS = {
   burger_order: 1,
   tag_win: 1, tag_loss: 1,
   robot_win: 1,
-  mystery_solved: 1,
+  // A Who Did It? solve reports the case's difficulty as its quantity —
+  // Cold Case is worth four Rookie solves. Four is the hardest tier, so
+  // nothing legitimate ever sends more.
+  mystery_solved: 4,
   kart_win: 1, kart_finish: 1,
   hub_coin: 1,
   pumpkin_pick: 5, ghost_banish: 3

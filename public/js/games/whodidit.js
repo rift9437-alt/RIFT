@@ -14,9 +14,19 @@ const WhoDidItGame = (function(){
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
 
-  const ROUND_SECONDS = 180;
-  const SEARCH_COST = 8;      // seconds burned searching a room
-  const TALK_COST = 5;        // seconds burned on a question
+  // Three ways to take a case. They change the clock, how many suspects are
+  // in the frame and how much the searching costs you — not how honest the
+  // evidence is. A "hard" mode that lies to you isn't harder, it's broken.
+  const DIFFICULTIES = {
+    rookie:   { name: 'Rookie',    seconds: 240, suspects: 4, search: 6,  talk: 4, pay: 1,
+                blurb: 'Four suspects, four minutes, cheap legwork.' },
+    standard: { name: 'Standard',  seconds: 180, suspects: 5, search: 8,  talk: 5, pay: 2,
+                blurb: 'Five suspects, three minutes.' },
+    cold:     { name: 'Cold Case', seconds: 120, suspects: 5, search: 12, talk: 8, pay: 4,
+                blurb: 'Two minutes, and every question costs you.' }
+  };
+  let difficulty = 'standard';
+  function rules(){ return DIFFICULTIES[difficulty] || DIFFICULTIES.standard; }
 
   const SUSPECTS = [
     { id: 'zip',   name: 'Zip',        icon: '🟢', colour: '#22c55e' },
@@ -66,8 +76,13 @@ const WhoDidItGame = (function(){
 
   function pick(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
 
+  // Who's in the frame this case. Rookie drops one suspect, which is a real
+  // difficulty knob: fewer people to separate with the same evidence.
+  let lineup = SUSPECTS;
+
   function generateCase(){
-    culprit = pick(SUSPECTS);
+    lineup = SUSPECTS.slice(0, rules().suspects);
+    culprit = pick(lineup);
     stolen = pick(STOLEN);
     const scene = pick(ROOMS);
 
@@ -77,12 +92,12 @@ const WhoDidItGame = (function(){
     // else is, so "who was in that room" has exactly one answer.
     const shuffledRooms = ROOMS.slice().sort(() => Math.random() - 0.5);
     truth.where = {};
-    SUSPECTS.forEach((sp, i) => {
+    lineup.forEach((sp, i) => {
       truth.where[sp.id] = sp.id === culprit.id
         ? scene.id
         : shuffledRooms[i % ROOMS.length].id;
     });
-    SUSPECTS.forEach(sp => {
+    lineup.forEach(sp => {
       if(sp.id !== culprit.id && truth.where[sp.id] === scene.id){
         truth.where[sp.id] = ROOMS.find(r => r.id !== scene.id).id;
       }
@@ -105,7 +120,7 @@ const WhoDidItGame = (function(){
       truth.traits.gloved[culprit.id] = truth.gloved;
       truth.traits.outfit[culprit.id] = truth.outfit;
     };
-    const others = SUSPECTS.filter(sp => sp.id !== culprit.id);
+    const others = lineup.filter(sp => sp.id !== culprit.id);
     const fitsEveryClue = id => asserted.every(k => truth.traits[k][id] === truth.traits[k][culprit.id]);
     rollCulprit();
     for(let attempt = 0; attempt < 300; attempt++){
@@ -149,7 +164,7 @@ const WhoDidItGame = (function(){
     // What each suspect will say. Traits are always given straight; only the
     // alibi can be a lie.
     testimony = {};
-    SUSPECTS.forEach(sp => {
+    lineup.forEach(sp => {
       const claimed = sp.id === truth.liar
         ? pick(ROOMS.filter(r => r.id !== truth.where[sp.id])).id
         : truth.where[sp.id];
@@ -176,7 +191,7 @@ const WhoDidItGame = (function(){
     if(!running || solved) return;
     if(searched[id]){ say('You have already been through there.'); return; }
     searched[id] = true;
-    timeLeft -= SEARCH_COST;
+    timeLeft -= rules().search;
     Sfx.play('click');
     render();
   }
@@ -185,7 +200,7 @@ const WhoDidItGame = (function(){
     if(!running || solved) return;
     if(questioned[id]){ say('They have told you all they will.'); return; }
     questioned[id] = true;
-    timeLeft -= TALK_COST;
+    timeLeft -= rules().talk;
     Sfx.play('select');
     render();
   }
@@ -205,9 +220,11 @@ const WhoDidItGame = (function(){
     Sfx.play(right ? 'win' : 'lose');
     const found = Object.values(searched).filter(Boolean).length;
     if(right){
-      const spent = ROUND_SECONDS - timeLeft;
+      const spent = rules().seconds - timeLeft;
       updateStat('whodidit', [{stat:'solved', type:'increment', value:1}]);
-      earnTokens('mystery_solved', 1);
+      // Harder cases pay more. The quantity is what the server caps and
+      // prices, so this stays a "how many" rather than a "how much".
+      earnTokens('mystery_solved', rules().pay);
       document.getElementById('whodidit-result-text').textContent = 'CASE CLOSED';
       document.getElementById('whodidit-result-sub').textContent =
         `${culprit.name} took ${stolen}. Solved in ${Math.round(spent)}s with ${found} of 4 rooms searched.`;
@@ -290,7 +307,7 @@ const WhoDidItGame = (function(){
     const SLH = 13;
     y = TOP + 18;
     let anyone = false;
-    SUSPECTS.forEach(sp => {
+    lineup.forEach(sp => {
       if(!questioned[sp.id]) return;
       anyone = true;
       ctx.font = 'bold 10px "JetBrains Mono", monospace';
@@ -353,7 +370,7 @@ const WhoDidItGame = (function(){
       box.innerHTML = `
         <div class="wdi-label">Who did it?</div>
         <div class="wdi-row">
-          ${SUSPECTS.map(sp => `
+          ${lineup.map(sp => `
             <button class="wdi-btn wdi-accuse ${cleared[sp.id] ? 'crossed' : ''}" style="--c:${sp.colour}"
                     onclick="WhoDidItGame.accuse('${sp.id}')">
               ${sp.icon} ${sp.name}${cleared[sp.id] ? ' · ruled out' : ''}
@@ -363,7 +380,7 @@ const WhoDidItGame = (function(){
       return;
     }
     box.innerHTML = `
-      <div class="wdi-label">Search a room &middot; ${SEARCH_COST}s each</div>
+      <div class="wdi-label">Search a room &middot; ${rules().search}s each</div>
       <div class="wdi-row">
         ${ROOMS.map(r => `
           <button class="wdi-btn ${searched[r.id] ? 'done' : ''}"
@@ -371,9 +388,9 @@ const WhoDidItGame = (function(){
             ${r.icon} ${r.name}
           </button>`).join('')}
       </div>
-      <div class="wdi-label">Question a suspect &middot; ${TALK_COST}s each</div>
+      <div class="wdi-label">Question a suspect &middot; ${rules().talk}s each</div>
       <div class="wdi-row">
-        ${SUSPECTS.map(sp => `
+        ${lineup.map(sp => `
           <button class="wdi-btn ${questioned[sp.id] ? 'done' : ''} ${cleared[sp.id] ? 'crossed' : ''}"
                   style="--c:${sp.colour}"
                   onclick="WhoDidItGame.question('${sp.id}')">
@@ -401,12 +418,21 @@ const WhoDidItGame = (function(){
     rafId = requestAnimationFrame(loop);
   }
 
+  function setDifficulty(id){
+    if(!DIFFICULTIES[id] || running) return;
+    difficulty = id;
+    document.querySelectorAll('#whodidit-difficulty .option-btn').forEach(b =>
+      b.classList.toggle('selected', b.dataset.diff === id));
+    const note = document.getElementById('whodidit-diff-note');
+    if(note) note.textContent = rules().blurb + ` Pays ${rules().pay}\u00d7.`;
+  }
+
   function start(){
     document.getElementById('whodidit-setup').classList.add('hidden');
     document.getElementById('whodidit-result').classList.add('hidden');
     document.getElementById('whodidit-play').classList.remove('hidden');
     generateCase();
-    timeLeft = ROUND_SECONDS;
+    timeLeft = rules().seconds;
     frame = 0;
     message = ''; messageTimer = 0;
     paused = false; running = true;
@@ -437,7 +463,7 @@ const WhoDidItGame = (function(){
       timeLeft: Math.max(0, Math.round(timeLeft)),
       evidence: ROOMS.filter(r => searched[r.id])
                      .map(r => ({ room: r.name, found: clues[r.id].map(c => c.text) })),
-      statements: SUSPECTS.filter(sp => questioned[sp.id])
+      statements: lineup.filter(sp => questioned[sp.id])
                           .map(sp => ({ who: sp.name, said: testimony[sp.id].slice() }))
     };
   }
@@ -451,5 +477,5 @@ const WhoDidItGame = (function(){
 
   return { start, stop, reset, onKeyPress, pause, resume, isPaused, isRunning,
            searchRoom, question, beginAccuse, cancelAccuse, accuse, caseNotes,
-           toggleCleared };
+           toggleCleared, setDifficulty };
 })();

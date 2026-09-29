@@ -226,7 +226,40 @@ const RobotGame = (function(){
     ];
   }
 
+  // Every fifth round is a boss: a named machine with more parts, better
+  // rolls and one modifier that changes how the fight goes rather than just
+  // handing it more hit points. A wall of extra HP is a longer fight, not a
+  // harder one.
+  const BOSSES = [
+    { name: 'THE SCRAPYARD KING', icon: '👑', mod: 'armour',
+      blurb: 'Plated to the teeth. Break a part off before it breaks you.' },
+    { name: 'SPLINTER',           icon: '⚡', mod: 'fast',
+      blurb: 'Half the armour, twice the speed. Lead your shots.' },
+    { name: 'THE LONG GUN',       icon: '🎯', mod: 'range',
+      blurb: 'Outranges you. Close the distance or be whittled down.' },
+    { name: 'HYDRA',              icon: '🐍', mod: 'many',
+      blurb: 'More parts than it should have. Aim for the guns.' }
+  ];
+  function bossFor(round){
+    return (round % 5 === 0) ? BOSSES[(Math.floor(round / 5) - 1) % BOSSES.length] : null;
+  }
+
   function enemyParts(round){
+    const boss = bossFor(round);
+    if(boss){
+      // Boss loadouts are rolled a tier up and skewed by the modifier, so
+      // each one fights differently rather than just soaking more.
+      const n = boss.mod === 'many' ? 10 : 7;
+      const out = [];
+      for(let i=0;i<n;i++){
+        let force = null;
+        if(boss.mod === 'armour' && i < 4) force = { family: 'plating' };
+        if(boss.mod === 'fast'   && i < 3) force = { family: 'thruster' };
+        if(boss.mod === 'range'  && i < 3) force = { family: 'scanner' };
+        out.push(makePart(round + 2, force));
+      }
+      return out;
+    }
     // Round one is deliberately thin — two parts rolled at the bottom of the
     // table — so the first fight teaches the controls instead of ending the
     // run before you've drafted anything.
@@ -617,7 +650,11 @@ const RobotGame = (function(){
     intermission = false; drafting = false;
     grace = ROUND_GRACE;
     camYaw = me.yaw;
-    banner = 'ROUND ' + round;
+    const boss = bossFor(round);
+    banner = boss ? boss.icon + ' ' + boss.name : 'ROUND ' + round;
+    if(boss && typeof toast === 'function'){
+      toast(boss.name, boss.blurb, boss.icon, 'pink');
+    }
     buffs = {};
     updateHud();
   }

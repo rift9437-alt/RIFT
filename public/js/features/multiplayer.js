@@ -77,6 +77,21 @@ function renderMpLobby(){
       <button class="btn btn-primary" onclick="createMpRoom()">Create room</button>
     </div>
 
+    <div class="mp-create">
+      <div class="setup-section-label">Or go alone</div>
+      <div class="mp-create-row">
+        <select id="tt-track" class="clan-input">
+          <option value="loop">🛣 Neon Loop</option>
+          <option value="spiral">🌀 Coil</option>
+          <option value="ribbon">🎗 Ribbon</option>
+        </select>
+        <button class="btn btn-secondary" onclick="startTimeTrial()">⏱ Time trial</button>
+      </div>
+      <div class="tagline" style="text-align:left; margin-top:4px;">
+        No items, no traffic &mdash; just you and the ghost of your best lap.
+      </div>
+    </div>
+
     <div class="mp-join">
       <div class="setup-section-label">Join with a code</div>
       <div class="mp-create-row">
@@ -455,4 +470,13 @@ async function postSpooky(event, qty){
     console.error('Season progress failed:', e);
     return null;
   }
+}
+
+
+// A trial needs no room and no server tick — it's a solo run against the
+// clock, so it goes straight to the track.
+function startTimeTrial(){
+  const track = (document.getElementById('tt-track') || {}).value || 'loop';
+  stopAllGames();
+  KartGame.startTimeTrial(track);
 }

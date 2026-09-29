@@ -2140,6 +2140,13 @@
       Both cost you time, so you can't do everything. When you're sure, name the culprit.
       A new case is generated every run.
     </div>
+    <div class="setup-section-label">How hard do you want it?</div>
+    <div class="option-row" id="whodidit-difficulty">
+      <button class="option-btn" data-diff="rookie" onclick="WhoDidItGame.setDifficulty('rookie')">Rookie</button>
+      <button class="option-btn selected" data-diff="standard" onclick="WhoDidItGame.setDifficulty('standard')">Standard</button>
+      <button class="option-btn" data-diff="cold" onclick="WhoDidItGame.setDifficulty('cold')">Cold Case</button>
+    </div>
+    <div class="tagline" id="whodidit-diff-note" style="margin-top:6px;">Five suspects, three minutes. Pays 2×.</div>
     <button class="btn btn-primary" onclick="WhoDidItGame.start()">Open the Case</button>
   </div>
   <div class="play-area hidden" id="whodidit-play">
