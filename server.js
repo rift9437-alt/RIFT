@@ -1134,6 +1134,41 @@ const ROGUELIKE_UPGRADES = {
 // Password required to edit the Update Log through the secret admin panel.
 // Override by setting ADMIN_PASSWORD in the environment before starting the server.
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ADMIN_123';
+// Patch notes that ship with the code. The stored log is seeded once and then
+// belongs to whoever edits it from the admin panel, so adding lines to
+// DEFAULT_UPDATELOG alone would never reach a database that already exists —
+// which is every database that matters. Each release here is prepended to the
+// stored log on boot if its marker isn't already in there, so notes arrive
+// with the deploy and anything typed by hand is left alone.
+const RELEASE_NOTES = [
+  {
+    id: '2026-09-29-bounties',
+    text: `[2026-09-29] BOUNTIES, CHALLENGES AND A LOT ELSE — the biggest drop since the season:
+  • BOUNTIES — three a day on the dashboard, each pointing at a score somebody here has actually set. Beat it and the tokens land the moment you do.
+  • CHALLENGES — go to anyone's profile and point them at one of your scores. They get a notification; you get one when they beat it.
+  • NOTIFICATIONS — a bell in the topbar for the things aimed at you: bounties paid, challenges, whispers, notes on your profile.
+  • RECENT RUNS — every run you finish is now recorded and shown on your profile, with a chart of how you're doing on any one cabinet.
+  • GUESTBOOK — leave a note on somebody's profile.
+  • WHISPERS — /w NAME something sends a private message. Clans get their own chat channel too.
+  • EXPORT — a button that hands you everything the server holds about you, as one file.
+  • MASTERY — five stars per cabinet, earned from how much you've played it and how your score stands against the best here.
+  • ZEN MODE — press Z to strip the page back to just the cabinet. Escape brings it back.
+  • COLOUR VISION — accent palettes for deuteranopia, protanopia and tritanopia, in Settings.
+  • A FIRST-RUN TOUR — five pointers for anyone new, replayable from Settings.
+  • BOSS ROUNDS — every fifth round of Robot Arena is now a named boss with a modifier that changes the fight, not just its hit points.
+  • WHO DID IT? — pick Rookie, Standard or Cold Case. Fewer suspects and more time, or two minutes and twelve seconds a room. Harder cases pay more.
+  • TIME TRIAL — Rift Kart without the items: you, the circuit, and the ghost of your best lap.
+  • HUB COURSE — stand on the podium in the hub to start a five-ring timed run.
+  • AUTO-PAUSE — alt-tabbing out of a game pauses it instead of quietly ending your run.
+  • The command palette (Ctrl+K) now finds players and achievements, not just cabinets.
+
+[2026-09-29] FIXED — three that mattered:
+  • Logging in could be refused for no visible reason. The general API rate limit and the login limit shared one counter per address, so about thirty ordinary requests — which one open tab makes on its own — locked out sign-ins from that connection. Everyone on the same home or school network shared the total.
+  • The chat poll was failing outright for anyone not in a clan; the live socket was hiding it.
+  • server.js had been uploaded as "server (3).js", which meant npm start had nothing to run.`
+  }
+];
+
 const DEFAULT_UPDATELOG = `=== LEVEL 7 UPDATE LOG ===
 
 [2026-08-05] BETTER BOT AI — Street Soccer, Apex Loop, and Tank Duel bots got smarter instead of just chasing you around:
@@ -1378,9 +1413,23 @@ async function initDb() {
       CONSTRAINT single_row CHECK (id = 1)
     )
   `);
-  const { rows } = await pool.query('SELECT id FROM updatelog WHERE id = 1');
+  const { rows } = await pool.query('SELECT id, content FROM updatelog WHERE id = 1');
   if (rows.length === 0) {
     await pool.query('INSERT INTO updatelog (id, content) VALUES (1, $1)', [DEFAULT_UPDATELOG]);
+  } else {
+    // Prepend any release note this database hasn't seen. The marker is an id
+    // in a comment line rather than a date, so re-running a deploy can't
+    // double-post and an admin's own edits are never overwritten.
+    let content = rows[0].content;
+    const pending = RELEASE_NOTES.filter(n => !content.includes('<!--' + n.id + '-->'));
+    if (pending.length) {
+      const header = '=== LEVEL 7 UPDATE LOG ===';
+      const body = content.startsWith(header) ? content.slice(header.length).replace(/^\n+/, '') : content;
+      const block = pending.map(n => '<!--' + n.id + '-->\n' + n.text).join('\n\n');
+      await pool.query('UPDATE updatelog SET content = $1 WHERE id = 1',
+                       [header + '\n\n' + block + '\n\n' + body]);
+      console.log(`Update log: added ${pending.length} release note(s).`);
+    }
   }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_log (
@@ -1856,7 +1905,11 @@ app.post('/api/leaderboard/update', async (req, res) => {
 });
 
 app.get('/api/updatelog', async (req, res) => {
-  res.json({ content: await loadUpdateLog() });
+  // The release markers are bookkeeping, not patch notes — strip them on the
+  // way out rather than storing the log without them, because they're how a
+  // redeploy knows what this database already has.
+  const content = (await loadUpdateLog()).replace(/^<!--[^>]*-->\n?/gm, '');
+  res.json({ content });
 });
 
 app.get('/api/broadcast', async (req, res) => {
@@ -2290,11 +2343,16 @@ async function loadChatSince(since, viewer, clanTag) {
 async function clanTagOf(user) {
   try {
     const { rows } = await pool.query(
-      'SELECT c.tag FROM clan_members m JOIN clans c ON c.id = m.clan_id WHERE m.username = $1 LIMIT 1',
+      'SELECT c.tag FROM clan_members m JOIN clans c ON c.id = m.clan_id WHERE m.user_id = $1 LIMIT 1',
       [user]
     );
     return rows.length ? rows[0].tag : null;
-  } catch (e) { return null; }
+  } catch (e) {
+    // Swallowing this silently is how the clan channel looked "empty" rather
+    // than broken the first time round, so say something.
+    console.error('Clan lookup failed:', e.message);
+    return null;
+  }
 }
 
 app.get('/api/chat', async (req, res) => {
@@ -2370,10 +2428,10 @@ app.post('/api/chat', async (req, res) => {
       pushNotification(audience, 'whisper', `${user} whispered`, clean.slice(0, 80));
     } else if (channel === 'clan') {
       const members = await pool.query(
-        'SELECT m.username FROM clan_members m JOIN clans c ON c.id = m.clan_id WHERE c.tag = $1',
+        'SELECT m.user_id FROM clan_members m JOIN clans c ON c.id = m.clan_id WHERE c.tag = $1',
         [audience]
-      ).catch(() => ({ rows: [] }));
-      const set = new Set(members.rows.map(r => r.username));
+      ).catch(e => { console.error('Clan fan-out failed:', e.message); return { rows: [] }; });
+      const set = new Set(members.rows.map(r => r.user_id));
       broadcastEvent('chat', { message: posted }, u => set.has(u));
     } else {
       broadcastEvent('chat', { message: posted });

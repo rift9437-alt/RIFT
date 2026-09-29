@@ -252,6 +252,8 @@ async function renderProfileExtras(username){
     const data = await res.json();
     const box = document.getElementById('profile-runs');
     const runs = data.runs || [];
+    lastRuns = runs;
+    drawRunChart(runs);
     box.innerHTML = runs.length
       ? runs.map(r => `
           <div class="run-row">
@@ -264,6 +266,77 @@ async function renderProfileExtras(username){
 
   loadGuestbook(username);
 }
+
+/* ---- form chart --------------------------------------------------------
+   The run list says what you played; this says whether you're getting better
+   at it. One cabinet at a time, because scores across different games aren't
+   on the same scale and plotting them together would be meaningless. */
+function drawRunChart(runs){
+  const canvas = document.getElementById('profile-chart');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const pick = document.getElementById('chart-game');
+  // Cabinets with enough runs to show a shape at all.
+  const counts = {};
+  runs.forEach(r => { counts[r.game] = (counts[r.game] || 0) + 1; });
+  const games = Object.keys(counts).filter(g => counts[g] >= 2);
+  if(pick && pick.dataset.built !== String(games.length)){
+    pick.dataset.built = String(games.length);
+    pick.innerHTML = games.map(g => {
+      const label = (runs.find(r => r.game === g) || {}).label || g;
+      return `<option value="${g}">${escapeHtml(label)}</option>`;
+    }).join('');
+  }
+  const game = (pick && pick.value) || games[0];
+
+  const series = runs.filter(r => r.game === game).slice().reverse();
+  const note = document.getElementById('chart-note');
+  if(series.length < 2){
+    if(note) note.textContent = 'Two runs on the same cabinet and a shape appears here.';
+    return;
+  }
+  if(note) note.textContent = `${series.length} recent runs · best ${Math.max(...series.map(r=>r.score)).toLocaleString('en-GB')}`;
+
+  const pad = 8;
+  const max = Math.max(...series.map(r => r.score)) || 1;
+  const min = Math.min(...series.map(r => r.score));
+  const span = (max - min) || max || 1;
+  const x = i => pad + (i / (series.length - 1)) * (W - pad * 2);
+  const y = v => H - pad - ((v - min) / span) * (H - pad * 2);
+
+  // Fill under the line, so a short series still reads as a chart rather
+  // than a stray diagonal.
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, 'rgba(45,226,197,0.35)');
+  grad.addColorStop(1, 'rgba(45,226,197,0.02)');
+  ctx.beginPath();
+  ctx.moveTo(x(0), H - pad);
+  series.forEach((r, i) => ctx.lineTo(x(i), y(r.score)));
+  ctx.lineTo(x(series.length - 1), H - pad);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  series.forEach((r, i) => i ? ctx.lineTo(x(i), y(r.score)) : ctx.moveTo(x(i), y(r.score)));
+  ctx.strokeStyle = '#2de2c5';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // A dot on every run, gold where it was a personal best at the time.
+  series.forEach((r, i) => {
+    ctx.beginPath();
+    ctx.arc(x(i), y(r.score), r.best ? 3.5 : 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = r.best ? '#ffc857' : '#7dd3ff';
+    ctx.fill();
+  });
+}
+
+let lastRuns = [];
+function changeChartGame(){ drawRunChart(lastRuns); }
 
 async function loadGuestbook(username){
   try{

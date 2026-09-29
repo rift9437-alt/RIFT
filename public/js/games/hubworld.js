@@ -43,6 +43,16 @@ const HubWorld = (function(){
     { icon:'👻', text:'Trick. Something came out.',  trick: true }
   ];
   let doorsUsed = [];
+  // A timed course round the plaza: hit five rings in order and the clock
+  // stops. Something to do in the hub that isn't wandering, and a personal
+  // best that's yours alone rather than another leaderboard to lose on.
+  const COURSE = [
+    { x:  12, z: -12 }, { x: -12, z: -12 }, { x: -14, z:  10 },
+    { x:   0, z:  16 }, { x:  14, z:  10 }
+  ];
+  const COURSE_KEY = 'level7_hub_course';
+  let courseAt = -1;          // -1 = not running, else the next ring
+  let courseStart = 0, courseBest = 0, courseLast = 0;
   let banished = 0;
   let spookyPending = { pumpkin: 0, ghost: 0 };
   let ended13 = false;   // one trip through the gate per visit
@@ -132,6 +142,20 @@ const HubWorld = (function(){
                              { glow: '#8b5cf6', glowBlur: 26 }));
     }
 
+    // The course rings. The one you're going for glows; the rest sit dim, so
+    // the route reads at a glance from anywhere on the plaza.
+    COURSE.forEach((c, i) => {
+      const live = courseAt === i;
+      const done = courseAt > i;
+      const col = live ? '#ffc857' : done ? '#2de2c5' : '#3a4560';
+      [[0, 1.6], [0.9, 1.0], [-0.9, 1.0]].forEach(([dx, h]) => {
+        out.push(...Mini3D.box(c.x + dx, h, c.z, 0.22, live ? 2.6 : 2.0, 0.22, col,
+                               live ? { glow: col, glowBlur: 20 } : edge));
+      });
+      out.push(...Mini3D.box(c.x, live ? 3.0 : 2.2, c.z, 2.1, 0.22, 0.22, col,
+                             live ? { glow: col, glowBlur: 20 } : edge));
+    });
+
     // scattered blocks to jump on
     const spots = [[-9,5],[8,-6],[11,7],[-12,-8],[5,12],[-6,-13]];
     spots.forEach(([x,z], i) => {
@@ -169,6 +193,23 @@ const HubWorld = (function(){
     }
   }
 
+  // Stepping onto the centre podium starts a run. No menu, no button — you
+  // start it by standing somewhere, which is the only interaction the hub has.
+  function maybeStartCourse(me){
+    if(courseAt >= 0) return;
+    if(Math.hypot(me.x, me.z) > 2.0) return;
+    if(frame - courseLastEnd < 90) return;      // don't instantly restart
+    courseAt = 0;
+    courseStart = Date.now();
+    props = buildProps();
+    Sfx.play('select');
+    if(typeof toast === 'function'){
+      toast('Course started', courseBest ? `Best ${(courseBest/1000).toFixed(1)}s` : 'Five rings, in order',
+            '🏁', 'cyan');
+    }
+  }
+  let courseLastEnd = -999;
+
   function reset(){
     const me = mpLocal();
     me.x = 6; me.y = 0; me.z = 6; me.yaw = -Math.PI * 0.75;
@@ -177,6 +218,8 @@ const HubWorld = (function(){
     camYaw = me.yaw;
     frame = 0;
     doorsUsed = [];
+    courseAt = -1; courseLast = 0; courseLastEnd = -999;
+    try{ courseBest = Number(localStorage.getItem(COURSE_KEY)) || 0; }catch(e){ courseBest = 0; }
   }
 
   function update(){
@@ -263,6 +306,39 @@ const HubWorld = (function(){
     // Progress is batched rather than one request per pickup — a plaza full
     // of pumpkins would otherwise be a request storm.
     if(frame % 120 === 0) flushSpooky();
+
+    maybeStartCourse(me);
+
+    // The course. Walk into the lit ring to take it; miss the order and
+    // nothing happens, so there's no way to shortcut the route.
+    if(courseAt >= 0 && courseAt < COURSE.length){
+      const ring = COURSE[courseAt];
+      if(Math.hypot(me.x - ring.x, me.z - ring.z) < 2.2){
+        courseAt++;
+        Sfx.play('coin', 1 + courseAt * 0.08);
+        props = buildProps();
+        if(courseAt >= COURSE.length){
+          courseLast = Date.now() - courseStart;
+          const fresh = !courseBest || courseLast < courseBest;
+          if(fresh){
+            courseBest = courseLast;
+            try{ localStorage.setItem(COURSE_KEY, String(courseBest)); }catch(e){}
+          }
+          courseAt = -1;
+          courseLastEnd = frame;
+          props = buildProps();
+          Sfx.play('win');
+          // Paid through the normal earn path, so the server's caps still
+          // apply and it can't become a token faucet.
+          if(typeof earnTokens === 'function') earnTokens('hub_coin', 3);
+          if(typeof toast === 'function'){
+            toast(fresh ? 'New best lap' : 'Course clear',
+                  `${(courseLast/1000).toFixed(1)}s${courseBest && !fresh ? ' · best ' + (courseBest/1000).toFixed(1) + 's' : ''}`,
+                  '🏁', fresh ? 'gold' : 'cyan');
+          }
+        }
+      }
+    }
 
     // Knocking on a door — walk into it. Each answers once a visit.
     if(haunted()){
@@ -415,7 +491,22 @@ const HubWorld = (function(){
     ctx.font = '11px "JetBrains Mono", monospace';
     ctx.fillStyle = 'rgba(232,236,241,0.55)';
     ctx.textAlign = 'left';
-    ctx.fillText('WASD move · SHIFT sprint · SPACE jump · 1-4 emote', 14, H - 14);
+    ctx.fillText('WASD move · SHIFT sprint · SPACE jump · 1-4 emote · stand on the podium to run the course', 14, H - 14);
+
+    // The clock, only while a run is live — plus your best, so there's
+    // something to measure it against.
+    if(courseAt >= 0){
+      const t = (Date.now() - courseStart) / 1000;
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 20px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#ffc857';
+      ctx.fillText(t.toFixed(1) + 's', W / 2, 34);
+      ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.fillStyle = 'rgba(232,236,241,0.6)';
+      ctx.fillText(`ring ${courseAt + 1} of ${COURSE.length}` +
+                   (courseBest ? ` · best ${(courseBest / 1000).toFixed(1)}s` : ''), W / 2, 52);
+      ctx.textAlign = 'left';
+    }
     ctx.textAlign = 'right';
     ctx.fillText(`${mpPlayers.size} here · room ${mpRoom ? mpRoom.code : '—'}`, W - 14, H - 14);
     if(haunted()){

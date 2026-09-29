@@ -252,3 +252,22 @@ body.zen::after {
 @media (max-width: 560px) {
   #tour-card { width: auto; left: 12px !important; right: 12px; }
 }
+
+/* ---- form chart -------------------------------------------------------- */
+.chart-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.profile-chart {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: block;
+  margin-bottom: 10px;
+}

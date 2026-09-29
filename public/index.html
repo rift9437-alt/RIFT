@@ -1445,6 +1445,11 @@
 
     <div class="profile-friends-block">
       <div class="shop-merge-title">🕹 Recent Runs</div>
+      <div class="chart-head">
+        <select id="chart-game" class="clan-input" style="margin:0; max-width:190px;" onchange="changeChartGame()"></select>
+        <span class="tagline" id="chart-note" style="margin:0;"></span>
+      </div>
+      <canvas id="profile-chart" width="560" height="110" class="profile-chart"></canvas>
       <div id="profile-runs"></div>
     </div>
 

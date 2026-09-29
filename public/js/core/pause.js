@@ -66,3 +66,25 @@ function quitCurrentGame(){
   document.getElementById('pause-overlay').classList.add('hidden');
   if(game && game.reset) game.reset();
 }
+
+
+/* =========================================================
+   AUTO-PAUSE WHEN THE TAB GOES AWAY
+   =========================================================
+   Alt-tabbing used to cost you the run: the loop keeps going, the zombies
+   keep coming, and you come back to a results screen. Anything with a
+   pause gets paused instead.
+
+   Only ever pauses — it never resumes for you. Coming back to a frozen
+   frame you un-pause yourself is fine; coming back to a game already
+   running before you've got your hands on the keys is not. */
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden) return;
+  const game = currentGameModule();
+  if(!game || !game.isRunning || !game.isRunning()) return;
+  if(game.isPaused && game.isPaused()) return;
+  // Multiplayer worlds are shared and keep running for everyone else, so
+  // freezing your own view of them would only desync what you see.
+  if(currentScreen === 'hub-screen' || currentScreen === 'kart-screen') return;
+  pauseCurrentGame();
+});
