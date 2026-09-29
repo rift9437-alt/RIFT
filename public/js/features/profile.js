@@ -75,6 +75,9 @@ async function renderProfile(username){
     lbBlock.classList.toggle('hidden', !isOwner);
     if(isOwner) loadFriendsLeaderboard();
   }
+
+  // Runs, guestbook and the challenge box hang off whoever's profile this is.
+  renderProfileExtras(username);
 }
 
 async function loadFriendsLeaderboard(){
@@ -101,7 +104,6 @@ async function loadFriendsLeaderboard(){
     console.error('Friends leaderboard load failed:', e);
   }
 }
-
 function renderFriendsList(friends, isOwner){
   const list = document.getElementById('profile-friends-list');
   const addRow = document.getElementById('profile-friend-add');
@@ -216,4 +218,92 @@ function startPlaytimeHeartbeat(){
 
 function stopPlaytimeHeartbeat(){
   if(playtimeHeartbeatTimer){ clearInterval(playtimeHeartbeatTimer); playtimeHeartbeatTimer = null; }
+}
+
+/* =========================================================
+   RECENT RUNS, GUESTBOOK, CHALLENGES
+   =========================================================
+   An all-time-best table tells you what someone once did. These tell you what
+   they've been doing, and give you something to say about it. */
+let profileViewing = null;
+
+async function renderProfileExtras(username){
+  profileViewing = username;
+  const mine = username === currentUser;
+
+  // Challenging yourself is not a thing.
+  const cblock = document.getElementById('profile-challenge-block');
+  if(cblock) cblock.classList.toggle('hidden', mine);
+  if(!mine){
+    const sel = document.getElementById('challenge-game');
+    if(sel){
+      // Only cabinets you've actually posted a score on — there has to be
+      // something for them to beat.
+      const mineRec = (lbCache && lbCache[currentUser]) || {};
+      const playable = CABINETS.filter(c => c.best && (mineRec[c.best.game] || {})[c.best.key]);
+      sel.innerHTML = playable.length
+        ? playable.map(c => `<option value="${c.best.game}">${escapeHtml(c.name)} · ${(mineRec[c.best.game]||{})[c.best.key]}</option>`).join('')
+        : '<option value="">Post a score somewhere first</option>';
+    }
+  }
+
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/runs?user=${encodeURIComponent(username)}`);
+    const data = await res.json();
+    const box = document.getElementById('profile-runs');
+    const runs = data.runs || [];
+    box.innerHTML = runs.length
+      ? runs.map(r => `
+          <div class="run-row">
+            <span class="run-game">${escapeHtml(r.label || r.game)}</span>
+            <span class="run-score ${r.best ? 'run-best' : ''}">${r.score.toLocaleString('en-GB')}${r.best ? ' ★' : ''}</span>
+            <span class="run-when">${feedAgo(r.at)}</span>
+          </div>`).join('')
+      : '<div class="notif-empty">No runs recorded yet.</div>';
+  }catch(e){ console.error('Runs load failed:', e); }
+
+  loadGuestbook(username);
+}
+
+async function loadGuestbook(username){
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/guestbook?user=${encodeURIComponent(username)}`);
+    const data = await res.json();
+    paintGuestbook(data.notes || []);
+  }catch(e){ console.error('Guestbook load failed:', e); }
+}
+
+function paintGuestbook(notes){
+  const box = document.getElementById('profile-guestbook');
+  if(!box) return;
+  box.innerHTML = notes.length
+    ? notes.map(n => `
+        <div class="gb-note">
+          <b>${escapeHtml(n.author)}</b><span>${feedAgo(n.at)}</span>
+          <p>${escapeHtml(n.body)}</p>
+        </div>`).join('')
+    : '<div class="notif-empty">Nothing written here yet.</div>';
+}
+
+async function signGuestbook(){
+  const input = document.getElementById('gb-input');
+  const body = (input.value || '').trim();
+  if(!body || !profileViewing) return;
+  try{
+    const res = await apiFetch(`${LB_API_BASE}/guestbook`, {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ user: currentUser, profile: profileViewing, body })
+    });
+    const data = await res.json();
+    if(!res.ok){ toast('Not posted', data.error || 'Try again', '📝', 'pink'); return; }
+    input.value = '';
+    paintGuestbook(data.notes || []);
+    Sfx.play('select');
+  }catch(e){ console.error('Guestbook post failed:', e); }
+}
+
+function challengeFromProfile(){
+  const game = document.getElementById('challenge-game').value;
+  if(!game || !profileViewing) return;
+  sendChallenge(profileViewing, game);
 }

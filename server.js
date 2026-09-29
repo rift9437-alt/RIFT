@@ -146,11 +146,17 @@ function clearLoginAttempts(username){
 // IP rate limiting — simple in-memory sliding window. Fine for a hobby-scale
 // site behind one server instance; not meant to replace a real WAF.
 const ipHits = new Map(); // ip -> [timestamps]
-function isRateLimited(ip, limit, windowMs){
+// `bucket` namespaces the counter. Without it every limiter on the site shared
+// one tally per IP, so ordinary API traffic counted against the login limit —
+// after ~30 requests in a minute (which a single open tab reaches on its own)
+// nobody from that address could sign in, and a whole household behind one
+// connection shared the total.
+function isRateLimited(bucket, ip, limit, windowMs){
+  const key = bucket + '\u0000' + ip;
   const now = Date.now();
-  let hits = (ipHits.get(ip) || []).filter(t => now - t < windowMs);
+  let hits = (ipHits.get(key) || []).filter(t => now - t < windowMs);
   hits.push(now);
-  ipHits.set(ip, hits);
+  ipHits.set(key, hits);
   return hits.length > limit;
 }
 function clientIp(req){
@@ -1427,6 +1433,74 @@ async function initDb() {
   `);
   await pool.query('CREATE INDEX IF NOT EXISTS feed_id_idx ON feed (id DESC)');
 
+  // Every finished run, so a profile can show what you've actually been
+  // playing rather than only your all-time best. Trimmed per player on write
+  // — this is a recent-form list, not an archive.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS runs (
+      id BIGSERIAL PRIMARY KEY,
+      username TEXT NOT NULL,
+      game TEXT NOT NULL,
+      score NUMERIC NOT NULL DEFAULT 0,
+      label TEXT NOT NULL DEFAULT '',
+      best BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS runs_user_idx ON runs (username, id DESC)');
+
+  // Things addressed to one person: a gift, a challenge, being named in chat.
+  // Separate from the feed, which is everybody's news — a notification is
+  // yours and has a read/unread state.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id BIGSERIAL PRIMARY KEY,
+      username TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      detail TEXT NOT NULL DEFAULT '',
+      seen BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS notif_user_idx ON notifications (username, id DESC)');
+
+  // "Beat this score" — either a daily bounty the arcade sets, or one player
+  // challenging another. Same table because they resolve the same way.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS challenges (
+      id BIGSERIAL PRIMARY KEY,
+      from_user TEXT NOT NULL DEFAULT '',
+      to_user TEXT NOT NULL,
+      game TEXT NOT NULL,
+      stat TEXT NOT NULL,
+      target NUMERIC NOT NULL,
+      reward INTEGER NOT NULL DEFAULT 0,
+      kind TEXT NOT NULL DEFAULT 'challenge',
+      day TEXT NOT NULL DEFAULT '',
+      done BOOLEAN NOT NULL DEFAULT false,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS challenge_to_idx ON challenges (to_user, done)');
+
+  // A short note left on somebody's profile.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS guestbook (
+      id BIGSERIAL PRIMARY KEY,
+      profile_user TEXT NOT NULL,
+      author TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS guestbook_idx ON guestbook (profile_user, id DESC)');
+
+  // Whispers and clan messages ride the chat table; a channel column keeps
+  // them out of the public room without a second pipeline.
+  await pool.query("ALTER TABLE chat ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'arcade'");
+  await pool.query("ALTER TABLE chat ADD COLUMN IF NOT EXISTS audience TEXT NOT NULL DEFAULT ''");
+
   // Community-created cosmetics: submissions + one-vote-per-category-per-month.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS cosmetic_submissions (
@@ -1635,7 +1709,7 @@ app.use((req, res, next) => {
 // against runaway clients or scripted abuse. /api/login has its own
 // stricter limit below.
 app.use('/api/', (req, res, next) => {
-  if (isRateLimited(clientIp(req), 180, 60 * 1000)) {
+  if (isRateLimited('api', clientIp(req), 180, 60 * 1000)) {
     return res.status(429).json({ error: 'Too many requests. Slow down and try again shortly.' });
   }
   next();
@@ -1652,7 +1726,7 @@ app.use('/api/', (req, res, next) => {
 
 app.post('/api/login', async (req, res) => {
   const ip = clientIp(req);
-  if (isRateLimited(ip, 30, 60 * 1000)) {
+  if (isRateLimited('login', ip, 30, 60 * 1000)) {
     return res.status(429).json({ error: 'Too many login attempts from this network. Try again in a minute.' });
   }
   const { username, password } = req.body || {};
@@ -1721,6 +1795,8 @@ app.post('/api/leaderboard/update', async (req, res) => {
       const data = await loadData();
       const record = data[user][game];
       const ceilings = STAT_CEILINGS[game] || {};
+      const before = Object.assign({}, record);
+      let runToRecord = null;
 
       for (const op of ops) {
         const { stat, type, value } = op;
@@ -1747,10 +1823,20 @@ app.post('/api/leaderboard/update', async (req, res) => {
             safeValue = Math.min(safeValue, ceilings[stat]);
           }
           record[stat] = Math.max(record[stat], safeValue);
+          // A "max" op is a run ending with a number worth keeping, which is
+          // exactly the moment there's a run to record.
+          if (stat === (GAME_PRIMARY_STAT[game] || '')) {
+            runToRecord = { score: value, best: value > before[stat] };
+          }
         }
       }
 
       checkAchievements(data, user);
+      await settleChallenges(data, user);
+      if (runToRecord) {
+        pushRun(user, game, runToRecord.score,
+                GAME_DISPLAY_NAMES[game] || game, runToRecord.best);
+      }
       await saveData(data);
       return data;
     });
@@ -1997,7 +2083,8 @@ function chatSpamCheck(username){
 }
 
 function chatRowToMessage(row) {
-  return { id: Number(row.id), user: row.username, text: row.body, at: row.created_at, reactions: {} };
+  return { id: Number(row.id), user: row.username, text: row.body, at: row.created_at,
+           channel: row.channel || 'arcade', audience: row.audience || '', reactions: {} };
 }
 
 // The set of reactions people are allowed to leave. A fixed list rather than
@@ -2026,6 +2113,132 @@ function pushFeed(username, kind, detail) {
     .catch(e => console.error('Feed write failed (ignored):', e.message));
 }
 
+// ---------------------------------------------------------------------------
+// Runs, notifications, bounties and challenges
+// ---------------------------------------------------------------------------
+const RUNS_KEEP_PER_USER = 40;
+
+// A finished run. Fire-and-forget like the feed: recording what you played
+// must never be able to fail the payout for playing it.
+function pushRun(username, game, score, label, isBest) {
+  pool.query(
+    'INSERT INTO runs (username, game, score, label, best) VALUES ($1,$2,$3,$4,$5)',
+    [username, game, Number(score) || 0, String(label || '').slice(0, 40), !!isBest]
+  ).then(() => pool.query(
+    // Keep only this player's most recent rows rather than a global cap, so a
+    // busy player can't push a quiet one's history out.
+    `DELETE FROM runs WHERE username = $1 AND id NOT IN (
+       SELECT id FROM runs WHERE username = $1 ORDER BY id DESC LIMIT $2)`,
+    [username, RUNS_KEEP_PER_USER]
+  )).catch(e => console.error('Run write failed (ignored):', e.message));
+}
+
+const NOTIF_KEEP_PER_USER = 60;
+function pushNotification(username, kind, title, detail) {
+  pool.query(
+    'INSERT INTO notifications (username, kind, title, detail) VALUES ($1,$2,$3,$4)',
+    [username, kind, String(title).slice(0, 80), String(detail || '').slice(0, 160)]
+  ).then(() => pool.query(
+    `DELETE FROM notifications WHERE username = $1 AND id NOT IN (
+       SELECT id FROM notifications WHERE username = $1 ORDER BY id DESC LIMIT $2)`,
+    [username, NOTIF_KEEP_PER_USER]
+  )).then(() => {
+    // Push it down the socket so the bell lights up without waiting for a poll.
+    broadcastEvent('notify', { user: username }, u => u === username);
+  }).catch(e => console.error('Notification write failed (ignored):', e.message));
+}
+
+// Which stat each cabinet's board is keyed on — the one number a bounty or a
+// challenge can be measured against.
+const GAME_PRIMARY_STAT = {
+  soccer: 'goals', racing: 'wins', tank: 'wins', runner: 'highScore',
+  wildduel: 'wins', asteroid: 'highScore', breaker: 'highScore',
+  roguelike: 'deepestFloor', comet: 'highScore', tunnel: 'highScore',
+  depths: 'bestWave', stack: 'bestHeight', golf: 'bestHoles', sumo: 'wins',
+  towerdefense: 'bestWave', parkour: 'bestTime', zombie: 'bestWave',
+  pirate: 'highScore', samurai: 'wins', policechase: 'highScore',
+  tactics: 'wins', runeduel: 'wins', warlord: 'wins', evolution: 'bestStage',
+  flood: 'bestRooms', hoops: 'highScore', burger: 'highScore', tag: 'wins',
+  robot: 'bestRound', whodidit: 'solved', kart: 'wins'
+};
+
+const BOUNTY_COUNT = 3;
+const BOUNTY_REWARD = 600;
+// A challenge is somebody picking on you personally, so it pays more.
+const CHALLENGE_REWARD = 900;
+
+// Three a day, the same for everyone, each asking you to beat a number
+// somebody in the arcade has actually posted. Aiming at a real score is what
+// makes a bounty feel like a rivalry rather than a chore.
+async function ensureBounties(user) {
+  const day = todayKey();
+  const { rows } = await pool.query(
+    "SELECT id FROM challenges WHERE to_user = $1 AND kind = 'bounty' AND day = $2 LIMIT 1",
+    [user, day]
+  );
+  if (rows.length) return;
+
+  const data = await loadData();
+  // Work out what's actually beatable first, then pick from that. Picking
+  // cabinets at random and hoping somebody has posted a score there gives you
+  // nothing on a quiet day, which is precisely when a bounty would help.
+  const candidates = [];
+  for (const game of Object.keys(GAME_PRIMARY_STAT)) {
+    const stat = GAME_PRIMARY_STAT[game];
+    const mine = (data[user] && data[user][game] && data[user][game][stat]) || 0;
+    // The best anybody else has managed, so there's a real name attached.
+    let bestUser = null, best = 0;
+    USERS.forEach(u => {
+      if (u === user) return;
+      const v = (data[u] && data[u][game] && data[u][game][stat]) || 0;
+      if (v > best) { best = v; bestUser = u; }
+    });
+    if (bestUser && best > mine) candidates.push({ game, stat, best, bestUser });
+  }
+  // Seeded by day and player, so your three are stable for the day and
+  // everyone gets their own set.
+  for (const c of seededPick('b' + day + user, candidates, BOUNTY_COUNT)) {
+    await pool.query(
+      `INSERT INTO challenges (from_user, to_user, game, stat, target, reward, kind, day)
+       VALUES ($1,$2,$3,$4,$5,$6,'bounty',$7)`,
+      [c.bestUser, user, c.game, c.stat, c.best, BOUNTY_REWARD, day]
+    );
+  }
+  // If nothing was beatable, no rows are written and the search simply runs
+  // again next time — it's a handful of lookups over data this request had to
+  // load anyway, and a "none today" marker would mean a player who looked
+  // before anyone posted a score got none for the rest of the day.
+
+}
+
+// Anything aimed at this player that their latest numbers now satisfy.
+// Called after a stat update, so a bounty pays the moment you beat it.
+async function settleChallenges(data, user) {
+  const { rows } = await pool.query(
+    'SELECT * FROM challenges WHERE to_user = $1 AND done = false', [user]
+  );
+  let paid = 0;
+  for (const c of rows) {
+    if (!c.game || !c.stat) continue;
+    const have = (data[user] && data[user][c.game] && data[user][c.game][c.stat]) || 0;
+    if (Number(have) < Number(c.target)) continue;
+    await pool.query('UPDATE challenges SET done = true WHERE id = $1', [c.id]);
+    const wallet = data[user].wallet;
+    wallet.tokens += c.reward;
+    wallet.xp = (wallet.xp || 0) + c.reward;
+    paid += c.reward;
+    const name = GAME_DISPLAY_NAMES[c.game] || c.game;
+    pushNotification(user, c.kind === 'bounty' ? 'bounty' : 'challenge',
+      c.kind === 'bounty' ? 'Bounty claimed' : 'Challenge beaten',
+      `${name} — you passed ${c.from_user || 'the target'} (+${c.reward} tokens)`);
+    if (c.kind === 'challenge' && c.from_user) {
+      pushNotification(c.from_user, 'challenge',
+        `${user} beat your challenge`, `${name} · ${c.target}`);
+    }
+  }
+  return paid;
+}
+
 // Folds reactions onto a batch of messages in one query rather than one per
 // message — a 200-message backfill would otherwise be 200 round trips.
 async function attachReactions(messages) {
@@ -2045,19 +2258,40 @@ async function attachReactions(messages) {
   return messages;
 }
 
-async function loadChatSince(since) {
+// Loading is scoped to what this person may see: the public room, their own
+// clan's channel, and whispers they sent or received. Enforced in SQL rather
+// than filtered afterwards, so a private message is never loaded at all.
+async function loadChatSince(since, viewer, clanTag) {
+  const visible = `(
+       channel = 'arcade'
+    OR (channel = 'clan'    AND audience <> '' AND audience = $CLAN)
+    OR (channel = 'whisper' AND (username = $ME OR audience = $ME))
+  )`;
   if (since > 0) {
-    const { rows } = await pool.query(
-      'SELECT id, username, body, created_at FROM chat WHERE id > $1 ORDER BY id ASC LIMIT 200',
-      [since]
-    );
+    const sql = 'SELECT id, username, body, created_at, channel, audience FROM chat WHERE id > $1 AND ' +
+                visible.replace(/\$ME/g, '$2').replace(/\$CLAN/g, '$3') +
+                ' ORDER BY id ASC LIMIT 200';
+    // No clan → '' , which the `audience <> ''` guard above makes unmatchable.
+    // A NUL byte would be the obvious sentinel and Postgres rejects it outright.
+    const { rows } = await pool.query(sql, [since, viewer || '', clanTag || '']);
     return attachReactions(rows.map(chatRowToMessage));
   }
-  const { rows } = await pool.query(
-    'SELECT id, username, body, created_at FROM chat ORDER BY id DESC LIMIT $1',
-    [CHAT_BACKLOG]
-  );
+  const sql = 'SELECT id, username, body, created_at, channel, audience FROM chat WHERE ' +
+              visible.replace(/\$ME/g, '$1').replace(/\$CLAN/g, '$2') +
+              ' ORDER BY id DESC LIMIT $3';
+  const { rows } = await pool.query(sql, [viewer || '', clanTag || '', CHAT_BACKLOG]);
   return attachReactions(rows.reverse().map(chatRowToMessage));
+}
+
+// Which clan tag a player belongs to, or null. Used to scope the clan channel.
+async function clanTagOf(user) {
+  try {
+    const { rows } = await pool.query(
+      'SELECT c.tag FROM clan_members m JOIN clans c ON c.id = m.clan_id WHERE m.username = $1 LIMIT 1',
+      [user]
+    );
+    return rows.length ? rows[0].tag : null;
+  } catch (e) { return null; }
 }
 
 app.get('/api/chat', async (req, res) => {
@@ -2067,7 +2301,7 @@ app.get('/api/chat', async (req, res) => {
   }
   const since = Math.max(0, parseInt(req.query.since, 10) || 0);
   try {
-    res.json({ messages: await loadChatSince(since) });
+    res.json({ messages: await loadChatSince(since, user, await clanTagOf(user)) });
   } catch (e) {
     console.error('Chat load failed:', e);
     res.status(500).json({ error: 'Internal error' });
@@ -2094,10 +2328,29 @@ app.post('/api/chat', async (req, res) => {
   }
   flagIfSuspicious(user, 'chat/post');
 
+  // Where this message goes. The client asks, but the server decides whether
+  // it's allowed: you can't post to a clan you aren't in, or whisper someone
+  // who doesn't exist.
+  let channel = 'arcade';
+  let audience = '';
+  const myClan = await clanTagOf(user);
+  if (req.body.channel === 'clan') {
+    if (!myClan) return res.status(400).json({ error: "You're not in a clan." });
+    channel = 'clan';
+    audience = myClan;
+  } else if (req.body.channel === 'whisper') {
+    const to = String(req.body.to || '');
+    if (!USERS.includes(to)) return res.status(400).json({ error: 'No such player.' });
+    if (to === user) return res.status(400).json({ error: 'Talking to yourself already.' });
+    channel = 'whisper';
+    audience = to;
+  }
+
   try {
     const inserted = await pool.query(
-      'INSERT INTO chat (username, body) VALUES ($1, $2) RETURNING id, username, body, created_at',
-      [user, clean]
+      'INSERT INTO chat (username, body, channel, audience) VALUES ($1, $2, $3, $4) ' +
+      'RETURNING id, username, body, created_at, channel, audience',
+      [user, clean, channel, audience]
     );
     // Opportunistic trim — cheap, and keeps the table from growing forever.
     if (Number(inserted.rows[0].id) % 25 === 0) {
@@ -2107,9 +2360,23 @@ app.post('/api/chat', async (req, res) => {
       ).catch(() => {});
     }
     const posted = chatRowToMessage(inserted.rows[0]);
-    broadcastEvent('chat', { message: posted });
+    // A whisper goes to two people and a clan message to that clan; only the
+    // public room is broadcast to everybody.
+    if (channel === 'whisper') {
+      broadcastEvent('chat', { message: posted }, u => u === user || u === audience);
+      pushNotification(audience, 'whisper', `${user} whispered`, clean.slice(0, 80));
+    } else if (channel === 'clan') {
+      const members = await pool.query(
+        'SELECT m.username FROM clan_members m JOIN clans c ON c.id = m.clan_id WHERE c.tag = $1',
+        [audience]
+      ).catch(() => ({ rows: [] }));
+      const set = new Set(members.rows.map(r => r.username));
+      broadcastEvent('chat', { message: posted }, u => set.has(u));
+    } else {
+      broadcastEvent('chat', { message: posted });
+    }
     const from = Math.max(0, parseInt(since, 10) || 0);
-    const messages = from > 0 ? await loadChatSince(from) : [posted];
+    const messages = from > 0 ? await loadChatSince(from, user, myClan) : [posted];
     res.json({ messages });
   } catch (e) {
     console.error('Chat post failed:', e);
@@ -2165,6 +2432,204 @@ app.post('/api/chat/react', async (req, res) => {
 });
 
 app.get('/api/chat/reactions', (req, res) => res.json({ options: CHAT_REACTIONS }));
+
+// ---------------------------------------------------------------------------
+// Runs, notifications, bounties, challenges, guestbook, export
+// ---------------------------------------------------------------------------
+
+// Recent form for a profile — what someone has actually been playing, which
+// an all-time-best table can't tell you.
+app.get('/api/runs', async (req, res) => {
+  const user = req.query.user;
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  try {
+    const { rows } = await pool.query(
+      'SELECT game, score, label, best, created_at FROM runs WHERE username = $1 ORDER BY id DESC LIMIT 20',
+      [user]
+    );
+    res.json({ runs: rows.map(r => ({
+      game: r.game, score: Number(r.score), label: r.label, best: r.best, at: r.created_at
+    })) });
+  } catch (e) {
+    console.error('Runs load failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.get('/api/notifications', async (req, res) => {
+  const user = authenticate(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, kind, title, detail, seen, created_at FROM notifications WHERE username = $1 ORDER BY id DESC LIMIT 30',
+      [user]
+    );
+    res.json({
+      unread: rows.filter(r => !r.seen).length,
+      items: rows.map(r => ({ id: Number(r.id), kind: r.kind, title: r.title,
+                              detail: r.detail, seen: r.seen, at: r.created_at }))
+    });
+  } catch (e) {
+    console.error('Notifications load failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/notifications/seen', async (req, res) => {
+  const user = authenticate(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+  try {
+    await pool.query('UPDATE notifications SET seen = true WHERE username = $1 AND seen = false', [user]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Notification mark failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Today's bounties plus any challenges someone has aimed at you.
+app.get('/api/bounties', async (req, res) => {
+  const user = authenticate(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+  try {
+    await ensureBounties(user);
+    const data = await loadData();
+    const { rows } = await pool.query(
+      `SELECT id, from_user, game, stat, target, reward, kind, done FROM challenges
+       WHERE to_user = $1 AND game <> '' AND (done = false OR day = $2)
+       ORDER BY kind, id DESC LIMIT 12`,
+      [user, todayKey()]
+    );
+    res.json({
+      reward: BOUNTY_REWARD,
+      items: rows.map(r => ({
+        id: Number(r.id), from: r.from_user, game: r.game,
+        gameName: GAME_DISPLAY_NAMES[r.game] || r.game,
+        stat: r.stat, target: Number(r.target), reward: r.reward,
+        kind: r.kind, done: r.done,
+        have: (data[user] && data[user][r.game] && data[user][r.game][r.stat]) || 0
+      }))
+    });
+  } catch (e) {
+    console.error('Bounty load failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Point a friend at one of your scores. The target is read from your own
+// record here rather than taken from the request, so nobody can invent an
+// impossible number to send somebody.
+app.post('/api/challenge', async (req, res) => {
+  const { user, to, game } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  if (!USERS.includes(to) || to === user) return res.status(400).json({ error: 'Unknown recipient' });
+  const stat = GAME_PRIMARY_STAT[game];
+  if (!stat) return res.status(400).json({ error: 'Unknown game' });
+  flagIfSuspicious(user, 'challenge');
+
+  try {
+    const data = await loadData();
+    const target = (data[user] && data[user][game] && data[user][game][stat]) || 0;
+    if (!target) return res.status(400).json({ error: "Post a score there first — there's nothing to beat." });
+    const theirs = (data[to] && data[to][game] && data[to][game][stat]) || 0;
+    if (theirs >= target) return res.status(400).json({ error: `${to} is already past that.` });
+
+    // Only a challenge blocks another challenge. A bounty can name you as the
+    // person to beat on the same cabinet, and that must not stop you issuing
+    // one of your own.
+    const dupe = await pool.query(
+      "SELECT id FROM challenges WHERE from_user = $1 AND to_user = $2 AND game = $3 " +
+      "AND kind = 'challenge' AND done = false",
+      [user, to, game]
+    );
+    if (dupe.rows.length) return res.status(400).json({ error: 'That challenge is already open.' });
+
+    await pool.query(
+      `INSERT INTO challenges (from_user, to_user, game, stat, target, reward, kind)
+       VALUES ($1,$2,$3,$4,$5,$6,'challenge')`,
+      [user, to, game, stat, target, CHALLENGE_REWARD]
+    );
+    const name = GAME_DISPLAY_NAMES[game] || game;
+    pushNotification(to, 'challenge', `${user} challenged you`,
+                     `${name} — beat ${target} for ${CHALLENGE_REWARD} tokens`);
+    res.json({ ok: true, target });
+  } catch (e) {
+    console.error('Challenge failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.get('/api/guestbook', async (req, res) => {
+  const user = req.query.user;
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  try {
+    const { rows } = await pool.query(
+      'SELECT author, body, created_at FROM guestbook WHERE profile_user = $1 ORDER BY id DESC LIMIT 20',
+      [user]
+    );
+    res.json({ notes: rows.map(r => ({ author: r.author, body: r.body, at: r.created_at })) });
+  } catch (e) {
+    console.error('Guestbook load failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.post('/api/guestbook', async (req, res) => {
+  const { user, profile, body } = req.body || {};
+  if (!USERS.includes(user)) return res.status(400).json({ error: 'Unknown user' });
+  if (!requireOwnUser(req, res, user)) return;
+  if (!USERS.includes(profile)) return res.status(400).json({ error: 'Unknown profile' });
+  const clean = String(body || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+  if (!clean) return res.status(400).json({ error: 'Say something.' });
+  const spam = chatSpamCheck(user);
+  if (spam) return res.status(429).json({ error: spam });
+  flagIfSuspicious(user, 'guestbook');
+
+  try {
+    await pool.query('INSERT INTO guestbook (profile_user, author, body) VALUES ($1,$2,$3)',
+                     [profile, user, clean]);
+    if (profile !== user) {
+      pushNotification(profile, 'guestbook', `${user} signed your profile`, clean.slice(0, 80));
+    }
+    const { rows } = await pool.query(
+      'SELECT author, body, created_at FROM guestbook WHERE profile_user = $1 ORDER BY id DESC LIMIT 20',
+      [profile]
+    );
+    res.json({ notes: rows.map(r => ({ author: r.author, body: r.body, at: r.created_at })) });
+  } catch (e) {
+    console.error('Guestbook post failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// Everything the server holds about you, as one file. Your own account only —
+// this is a "take your data with you" button, not a way to read someone else's.
+app.get('/api/export', async (req, res) => {
+  const user = authenticate(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated. Please log in again.' });
+  try {
+    const data = await loadData();
+    const runs = await pool.query(
+      'SELECT game, score, label, best, created_at FROM runs WHERE username = $1 ORDER BY id DESC', [user]);
+    const notes = await pool.query(
+      'SELECT author, body, created_at FROM guestbook WHERE profile_user = $1 ORDER BY id DESC', [user]);
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      user,
+      stats: Object.fromEntries(Object.keys(DEFAULT_STATS).map(g => [g, data[user][g]])),
+      wallet: data[user].wallet,
+      runs: runs.rows,
+      guestbook: notes.rows
+    };
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="level7-${user}.json"`);
+    res.send(JSON.stringify(payload, null, 2));
+  } catch (e) {
+    console.error('Export failed:', e);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
 
 // Your friends' recent doings, newest first. Falls back to the whole arcade
 // when you haven't added anyone yet — an empty panel teaches nothing, and

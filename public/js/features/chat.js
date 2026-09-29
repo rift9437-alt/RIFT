@@ -12,6 +12,10 @@ let chatPollTimer = null;
 let chatOpen = false;
 let chatUnread = 0;
 let chatSending = false;
+// Which room you're typing into. Whispers always arrive whatever tab you're
+// on — they're addressed to you, so hiding them behind a tab would just mean
+// missing them.
+let chatChannel = 'arcade';
 
 function escapeHtml(str){
   return String(str)
@@ -54,6 +58,33 @@ function setChatOpen(open){
     refreshChat(true);
   }
   try{ localStorage.setItem(CHAT_OPEN_KEY, open ? '1' : '0'); }catch(e){}
+}
+
+// Swap between the public room and your clan's. Rebuilt rather than refetched
+// — every message the server was willing to send is already in the buffer.
+function setChatChannel(ch){
+  chatChannel = ch;
+  document.querySelectorAll('.chat-tab').forEach(t =>
+    t.classList.toggle('on', t.dataset.chan === ch));
+  const input = document.getElementById('chat-input');
+  if(input){
+    input.placeholder = ch === 'clan' ? 'Say something to your clan…'
+                                      : 'Say something to the other keyholders…';
+  }
+  renderChat();
+}
+
+function refreshChatTabs(){
+  const bar = document.getElementById('chat-tabs');
+  if(!bar) return;
+  const tag = (typeof clanTagFor === 'function') ? clanTagFor(currentUser) : '';
+  // No clan, no clan tab — and if you've just left one, don't strand the
+  // dock on a channel you can no longer post to.
+  bar.innerHTML = `
+    <button class="chat-tab on" data-chan="arcade" onclick="setChatChannel('arcade')">ARCADE</button>
+    ${tag ? `<button class="chat-tab" data-chan="clan" onclick="setChatChannel('clan')">[${escapeHtml(tag)}]</button>` : ''}`;
+  if(!tag && chatChannel === 'clan') setChatChannel('arcade');
+  else setChatChannel(chatChannel);
 }
 
 function toggleChatDock(){
@@ -118,7 +149,11 @@ function renderChat(){
     return;
   }
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
-  log.innerHTML = chatMessages.map(m=>{
+  log.innerHTML = chatMessages.filter(m => {
+    const ch = m.channel || 'arcade';
+    if(ch === 'whisper') return true;          // always shown
+    return ch === chatChannel;
+  }).map(m=>{
     const mine = m.user === currentUser;
     const atMe = mentionsMe(m.text) && !mine;
     // /me reads as an action rather than as something someone said, so it
@@ -127,9 +162,13 @@ function renderChat(){
     if(action){
       return `<div class="chat-msg chat-action">${chatBodyHtml(m.text.slice(2, -2))}</div>${reactionRow(m)}`;
     }
+    const ch = m.channel || 'arcade';
+    const tag = ch === 'whisper'
+      ? `<span class="chat-chan chat-chan-w">${mine ? '→ ' + escapeHtml(m.audience || '') : 'whisper'}</span>`
+      : ch === 'clan' ? '<span class="chat-chan chat-chan-c">clan</span>' : '';
     return `
-      <div class="chat-msg ${mine?'me':''} ${atMe?'at-me':''}">
-        <div class="chat-msg-head">
+      <div class="chat-msg ${mine?'me':''} ${atMe?'at-me':''} ${ch === 'whisper' ? 'is-whisper' : ''}">
+        <div class="chat-msg-head">${tag}
           <span class="chat-msg-user">${typeof clanTagFor === 'function' && clanTagFor(m.user) ? `<span class="clan-badge">[${escapeHtml(clanTagFor(m.user))}]</span>` : ''}${escapeHtml(m.user)}${mine?' (you)':''}</span>
           <span class="chat-msg-time">${chatTime(m.at)}</span>
         </div>
@@ -247,8 +286,19 @@ function expandChatCommand(raw){
       const val = rec ? rec[cab.best.key] : 0;
       return `* ${currentUser}'s best on ${cab.name}: ${val || 0} *`;
     }
+    case 'w':
+    case 'whisper': {
+      // /w NAME message — routed rather than expanded, so the text itself
+      // stays whatever they typed.
+      const to = rest[0] || '';
+      const body = rest.slice(1).join(' ').trim();
+      if(!to || !body) return { error: 'Usage: /w NAME something' };
+      const match = USERS.find(u => u.toLowerCase() === to.toLowerCase());
+      if(!match) return { error: `No player called ${to}.` };
+      return { text: body, channel: 'whisper', to: match };
+    }
     case 'help':
-      return `* commands: /me, /roll, /shrug, /stats <cabinet> *`;
+      return `* commands: /me, /roll, /shrug, /w NAME msg, /stats <cabinet> *`;
     default:
       return raw;   // not a command we know — send it as typed
   }
@@ -260,18 +310,24 @@ async function sendChatMessage(){
   const typed = input.value.trim();
   err.textContent = '';
   if(!typed || chatSending) return;
-  const text = expandChatCommand(typed);
-  if(text === null){
+  const expanded = expandChatCommand(typed);
+  if(expanded === null){
     err.textContent = 'Usage: /me does something';
     return;
   }
+  // A command can route as well as rewrite — /w sends to one person.
+  const routed = (expanded && typeof expanded === 'object') ? expanded : null;
+  if(routed && routed.error){ err.textContent = routed.error; return; }
+  const text = routed ? routed.text : expanded;
+  const channel = routed ? routed.channel : chatChannel;
+  const to = routed ? routed.to : undefined;
   chatSending = true;
   document.getElementById('chat-send').disabled = true;
   try{
     const res = await apiFetch(`${LB_API_BASE}/chat`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ user: currentUser, text, since: chatLastId })
+      body: JSON.stringify({ user: currentUser, text, since: chatLastId, channel, to })
     });
     const data = await res.json().catch(()=>({}));
     if(!res.ok){

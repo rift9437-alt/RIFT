@@ -80,12 +80,15 @@ function afterLogin(){
   openChatDock();
   startChatPolling();
   if(typeof startFeedPolling === 'function') startFeedPolling();
+  if(typeof startNotifPolling === 'function') startNotifPolling();
   if(typeof TV !== 'undefined') TV.start();
   if(typeof renderRival === 'function') setTimeout(renderRival, 800);
   if(typeof wireSecretSpots === 'function') wireSecretSpots();
   if(typeof Realtime !== 'undefined') Realtime.start();
   if(typeof refreshGlobalStats === 'function') refreshGlobalStats();
   if(typeof loadClans === 'function') loadClans().then(()=>{
+    // The clan tab can only be built once we know whether there's a clan.
+    if(typeof refreshChatTabs === 'function') refreshChatTabs();
     if(typeof renderChat === 'function') renderChat();
   });
 }
@@ -97,6 +100,7 @@ function logout(){
   stopPlaytimeHeartbeat();
   stopChatPolling();
   if(typeof stopFeedPolling === 'function') stopFeedPolling();
+  if(typeof stopNotifPolling === 'function') stopNotifPolling();
   hideChatDock();
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_TOKEN_KEY);

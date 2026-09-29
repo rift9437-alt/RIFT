@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="css/robot.css">
   <link rel="stylesheet" href="css/whodidit.css">
   <link rel="stylesheet" href="css/palette.css">
+  <link rel="stylesheet" href="css/notify.css">
 </head>
 <body>
 <div class="scanlines"></div>
@@ -56,6 +57,7 @@
     <div class="topbar-right">
       <span class="token-badge" id="token-balance">🪙 0</span>
       <button class="icon-btn" id="sound-toggle-btn" onclick="toggleSound()" title="Toggle sound">🔊</button>
+      <button class="icon-btn notif-btn" id="notif-btn" onclick="toggleNotifications()" title="Notifications">🔔<span class="notif-count hidden" id="notif-count">0</span></button>
       <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
       <button class="icon-btn" id="music-toggle-btn" onclick="toggleMenuMusic()" title="Menu music">🎶</button>
       <button class="icon-btn" onclick="openCollection()" title="Collection">📚</button>
@@ -70,8 +72,17 @@
       <button class="btn btn-secondary" onclick="logout()">Log Out</button>
     </div>
   </div>
+  <div class="notif-panel hidden" id="notif-panel">
+    <div class="notif-head">NOTIFICATIONS</div>
+    <div id="notif-list"></div>
+  </div>
   <div class="dash-content">
     <div class="dash-welcome" id="dash-welcome-line">WELCOME BACK</div>
+    <div class="community-section" id="bounty-panel" style="margin-bottom:20px;">
+      <h3>🎯 Bounties</h3>
+      <div class="community-sub" id="bounty-note">Beat the number and the tokens land the moment you do.</div>
+      <div class="cosmetic-grid" id="bounty-grid"></div>
+    </div>
     <div class="community-section" id="daily-panel" style="margin-bottom:20px;">
       <h3>📅 Daily Challenges <span id="daily-streak-label" style="font-family:var(--font-mono); font-size:11px; color:var(--gold); font-weight:400; margin-left:8px;"></span></h3>
       <div class="community-sub">Same 3 challenges for everyone, every day. Clear all 3 to keep your streak alive for a bigger bonus &mdash; and swap one you can&rsquo;t face with 🎲, once a day.</div>
@@ -1433,6 +1444,29 @@
     </div>
 
     <div class="profile-friends-block">
+      <div class="shop-merge-title">🕹 Recent Runs</div>
+      <div id="profile-runs"></div>
+    </div>
+
+    <div class="profile-friends-block" id="profile-challenge-block">
+      <div class="shop-merge-title">⚔ Challenge them</div>
+      <div class="profile-friend-add">
+        <select id="challenge-game" class="clan-input"></select>
+        <button class="btn btn-secondary" onclick="challengeFromProfile()">Send</button>
+      </div>
+      <div class="tagline" style="text-align:left; margin-top:6px;">They have to beat your best on that cabinet.</div>
+    </div>
+
+    <div class="profile-friends-block">
+      <div class="shop-merge-title">📝 Guestbook</div>
+      <div id="profile-guestbook"></div>
+      <div class="gb-form">
+        <input id="gb-input" class="clan-input" maxlength="140" placeholder="Leave a note…">
+        <button class="btn btn-secondary" onclick="signGuestbook()">Sign</button>
+      </div>
+    </div>
+
+    <div class="profile-friends-block">
       <div class="shop-merge-title">👥 Friends</div>
       <div class="profile-friends-list" id="profile-friends-list"></div>
       <div class="profile-friend-add" id="profile-friend-add"></div>
@@ -1721,6 +1755,7 @@
         <button class="chat-mini-btn" onclick="toggleChatDock()" title="Minimise">–</button>
       </div>
     </div>
+    <div class="chat-tabs" id="chat-tabs"></div>
     <div class="chat-log" id="chat-log">
       <div class="chat-note">Loading the room…</div>
     </div>
@@ -2385,6 +2420,7 @@
 <script src="js/features/qol.js"></script>
 <script src="js/features/palette.js"></script>
 <script src="js/features/feed.js"></script>
+<script src="js/features/notify.js"></script>
 <script src="js/features/results.js"></script>
 <script src="js/features/shopplus.js"></script>
 <script src="js/features/collection.js"></script>

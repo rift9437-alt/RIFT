@@ -212,6 +212,12 @@ const Realtime = (function(){
 
 // A reaction is a change to a message that's already on screen, so it comes
 // down its own channel rather than resending the message.
+// Something landed that's addressed to this player — refresh the bell rather
+// than waiting up to a minute for the fallback poll.
+Realtime.on('notify', () => {
+  if(typeof loadNotifications === 'function') loadNotifications();
+});
+
 Realtime.on('chat:react', payload => {
   if(!payload || typeof applyReactions !== 'function') return;
   applyReactions(payload.messageId, payload.reactions);
